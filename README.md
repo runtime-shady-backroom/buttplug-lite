@@ -31,8 +31,8 @@ This application provides a proxy around the [intiface](https://intiface.com/des
 | `r` | Lovense Nora | Rotation (needs confirmation)
 
 ## Usage
-
-Simply run intiface-proxy.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs as well as kill it easily. If you run it directly you will have to kill it from task manager.
+1. Download the [latest release](https://github.com/runtime-shady-backroom/intiface-proxy/releases/latest).
+2. Simply run intiface-proxy.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs and kill the process easily. If you run it directly you will have to kill it from task manager, as there is no GUI.
 
 ### Sending Commands
 Send text messages to `ws://127.0.0.1:3031/haptic`.
