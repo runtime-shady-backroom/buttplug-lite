@@ -18,7 +18,7 @@ type IntegerDb = Arc<Mutex<Option<i64>>>;
 type HapticClientDb = Arc<Mutex<Option<ButtplugClient>>>;
 
 const EMPTY_STRING: String = String::new();
-const WATCHDOG_TIMEOUT: i64 = 10;
+const WATCHDOG_TIMEOUT_MILLIS: i64 = 10000;
 const HAPTIC_SERVER_CLIENT_NAME: &str = "intiface-proxy";
 const HAPTIC_SERVER_ADDRESS: &str = "ws://127.0.0.1:12345";
 
@@ -76,11 +76,11 @@ async fn main() {
 
             let mut watchdog_time_mutex = haptic_watchdog_db.lock().await;
             let watchdog_violation = match *watchdog_time_mutex {
-                Some(watchdog_time) => unix_time - watchdog_time > WATCHDOG_TIMEOUT * 1000,
+                Some(watchdog_time) => unix_time - watchdog_time > WATCHDOG_TIMEOUT_MILLIS,
                 None => false
             };
             if watchdog_violation {
-                println!("Watchdog violation! Killing all haptics. To avoid this force an update every {} seconds.", WATCHDOG_TIMEOUT);
+                println!("Watchdog violation! Halting all devices. To avoid this send an update at least every {}ms.", WATCHDOG_TIMEOUT_MILLIS);
                 *watchdog_time_mutex = None; // this prevents the message from spamming
                 drop(watchdog_time_mutex);
                 let haptic_client_mutex = watchdog_haptic_client_clone.lock().await;
@@ -88,16 +88,16 @@ async fn main() {
                     Some(haptic_client) => {
                         match haptic_client.stop_all_devices().await {
                             Ok(()) => (),
-                            Err(e) => eprintln!("watchdog: error halting haptic devices: {:?}", e)
+                            Err(e) => eprintln!("watchdog: error halting devices: {:?}", e)
                         }
                     }
-                    None => () // do nothing because there is no haptic server connected
+                    None => () // do nothing because there is no server connected
                 }
             }
         }
     });
 
-    // spawn the haptic server reconnect task
+    // spawn the server reconnect task
     // when the server is connected this functions as the event reader
     // when the server is disconnected it attempts to reconnect after a delay
     tokio::task::spawn(async move {
@@ -127,15 +127,15 @@ async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
     ));
     match ButtplugClient::connect(HAPTIC_SERVER_CLIENT_NAME, haptic_client).await {
         Ok((haptic_client, mut haptic_events)) => {
-            println!("{}: Haptic server connected!", LOG_PREFIX_HAPTIC_SERVER);
+            println!("{}: Intiface connected!", LOG_PREFIX_HAPTIC_SERVER);
             match haptic_client.start_scanning().await {
-                Ok(()) => println!("{}: Scanning for haptic devices...", LOG_PREFIX_HAPTIC_SERVER),
+                Ok(()) => println!("{}: Scanning for devices...", LOG_PREFIX_HAPTIC_SERVER),
                 Err(e) => eprintln!("{}: Scan failure: {:?}", LOG_PREFIX_HAPTIC_SERVER, e)
             };
             *haptic_client_mutex = Some(haptic_client);
             drop(haptic_client_mutex);
             loop {
-                println!("{}: waiting for event...", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove
+                println!("{}: waiting for event...", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove when done debugging deadlock
                 match haptic_events.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => println!("{}: device connected: {}", LOG_PREFIX_HAPTIC_SERVER, dev.name),
@@ -147,7 +147,7 @@ async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
                             println!("{}: server disconnected", LOG_PREFIX_HAPTIC_SERVER);
                             let mut haptic_client_mutex = haptic_client_db.lock().await;
                             *haptic_client_mutex = None; // not strictly required but will give more sane error messages
-                            println!("{}: didn't deadlock!", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove
+                            println!("{}: didn't deadlock!", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove when done debugging deadlock
                             break;
                         }
                     },
@@ -172,7 +172,7 @@ async fn haptic_status_handler(haptic_client: HapticClientDb) -> Result<impl war
     match haptic_client_mutex.as_ref() {
         Some(haptic_client) => {
             let connected = haptic_client.connected();
-            let mut string = String::from(format!("haptic server connected={}", connected));
+            let mut string = String::from(format!("intiface connected={}", connected));
             for device in haptic_client.devices() {
                 string.push_str(format!("\n  {}", device.name).as_str());
                 for (message_type, attributes) in device.allowed_messages {
@@ -181,7 +181,7 @@ async fn haptic_status_handler(haptic_client: HapticClientDb) -> Result<impl war
             }
             Ok(string)
         }
-        None => Ok(String::from("haptic server connected=None"))
+        None => Ok(String::from("intiface connected=None"))
     }
 }
 
@@ -194,7 +194,7 @@ async fn haptic_scan_handler(haptic_client: HapticClientDb) -> Result<impl warp:
                 Err(e) => Ok(Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(format!("{:?}", e)))
             }
         }
-        None => Ok(Response::builder().status(StatusCode::SERVICE_UNAVAILABLE).body(format!("haptic server not connected")))
+        None => Ok(Response::builder().status(StatusCode::SERVICE_UNAVAILABLE).body(format!("intifiace not connected")))
     }
 }
 
@@ -261,8 +261,13 @@ async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_client: HapticCli
 
 fn motor_from_tag<'a>(tag: &str) -> Option<MotorId<'a>> {
     match tag {
-        "o" => Some(MotorId { name: "Lovense Edge", feature_index: 0 }), // outer
-        "i" => Some(MotorId { name: "Lovense Edge", feature_index: 1 }), // inner
+        "o" => Some(MotorId { name: "Lovense Edge", feature_index: 0 }), // edge outer (verified)
+        "i" => Some(MotorId { name: "Lovense Edge", feature_index: 1 }), // edge inner (verified)
+        "h" => Some(MotorId { name: "Lovense Hush", feature_index: 0 }), // hush
+        "l" => Some(MotorId { name: "Lovense Lush", feature_index: 0 }), // lush 2
+        "m" => Some(MotorId { name: "Lovense Max", feature_index: 0 }), // max 2 (suction not supported)
+        "n" => Some(MotorId { name: "Lovense Nora", feature_index: 0 }), // nora vibration (needs verification)
+        "r" => Some(MotorId { name: "Lovense Nora", feature_index: 1 }), // nora rotation (needs verification)
         _ => None
     }
 }
@@ -274,15 +279,15 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
         let mut split_line = line.split(':');
         let tag = match split_line.next() {
             Some(tag) => tag,
-            None => return Err(format!("could not extract tag from {}", line))
+            None => return Err(format!("could not extract motor tag from {}", line))
         };
         let intensity = match split_line.next() {
             Some(tag) => tag,
-            None => return Err(format!("could not extract intensity from {}", line))
+            None => return Err(format!("could not extract motor intensity from {}", line))
         };
         let intensity = match intensity.parse::<f64>() {
             Ok(f) => f,
-            Err(e) => return Err(format!("could parse intensity from {}: {:?}", intensity, e))
+            Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
         };
         match motor_from_tag(tag) {
             Some(motor) => {
@@ -291,7 +296,7 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
                     .or_insert(HashMap::new())
                     .insert(motor.feature_index, intensity);
             }
-            None => eprintln!("Ignoring unknown tag {}", tag)
+            None => eprintln!("Ignoring unknown motor tag {}", tag)
         };
     };
 
