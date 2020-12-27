@@ -1,6 +1,6 @@
 [package]
 name = "intiface-proxy"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 edition = "2018"
 

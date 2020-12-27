@@ -33,6 +33,8 @@ struct MotorId<'a> {
 
 #[tokio::main]
 async fn main() {
+    println!("Initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+
     let proxy_server_address: SocketAddr = ([127, 0, 0, 1], 3031).into();
 
     let haptic_watchdog_db: IntegerDb = Arc::new(Mutex::new(None));
@@ -111,7 +113,7 @@ async fn main() {
         }
     });
 
-    println!("Starting web server...");
+    println!("Starting web server");
     warp::serve(routes)
         .run(proxy_server_address)
         .await;
@@ -129,8 +131,8 @@ async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
         Ok((haptic_client, mut haptic_events)) => {
             println!("{}: Intiface connected!", LOG_PREFIX_HAPTIC_SERVER);
             match haptic_client.start_scanning().await {
-                Ok(()) => println!("{}: Scanning for devices...", LOG_PREFIX_HAPTIC_SERVER),
-                Err(e) => eprintln!("{}: Scan failure: {:?}", LOG_PREFIX_HAPTIC_SERVER, e)
+                Ok(()) => println!("{}: starting device scan", LOG_PREFIX_HAPTIC_SERVER),
+                Err(e) => eprintln!("{}: scan failure: {:?}", LOG_PREFIX_HAPTIC_SERVER, e)
             };
             *haptic_client_mutex = Some(haptic_client);
             drop(haptic_client_mutex);
@@ -142,7 +144,7 @@ async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
                         ButtplugClientEvent::DeviceRemoved(dev) => println!("{}: device disconnected: {}", LOG_PREFIX_HAPTIC_SERVER, dev.name),
                         ButtplugClientEvent::PingTimeout => println!("{}: ping timeout", LOG_PREFIX_HAPTIC_SERVER),
                         ButtplugClientEvent::Error(e) => println!("{}: server error: {:?}", LOG_PREFIX_HAPTIC_SERVER, e),
-                        ButtplugClientEvent::ScanningFinished => println!("{}: scan finished", LOG_PREFIX_HAPTIC_SERVER),
+                        ButtplugClientEvent::ScanningFinished => println!("{}: device scan finished", LOG_PREFIX_HAPTIC_SERVER),
                         ButtplugClientEvent::ServerDisconnect => {
                             println!("{}: server disconnected", LOG_PREFIX_HAPTIC_SERVER);
                             let mut haptic_client_mutex = haptic_client_db.lock().await;
@@ -200,6 +202,7 @@ async fn haptic_scan_handler(haptic_client: HapticClientDb) -> Result<impl warp:
 
 // haptic handler
 async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_client: HapticClientDb, watchdog_time: IntegerDb) {
+    println!("{}: client connected", LOG_PREFIX_HAPTIC_ENDPOINT);
     let (_, mut rx) = websocket.split();
     while let Some(result) = rx.next().await {
         let message = match result {
@@ -212,7 +215,7 @@ async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_client: HapticCli
         let message = match message.to_str() {
             Ok(str) => str,
             Err(_) => {
-                if message.is_binary() || message.is_close() {
+                if message.is_binary() {
                     eprintln!("{}: error converting message to string: {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, message);
                 } else if message.is_close() {
                     println!("{}: client closed connection", LOG_PREFIX_HAPTIC_ENDPOINT)
@@ -256,7 +259,7 @@ async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_client: HapticCli
             None => () // no server connected, so send no commands
         }
     }
-    println!("{}: disconnected", LOG_PREFIX_HAPTIC_ENDPOINT);
+    println!("{}: client disconnected", LOG_PREFIX_HAPTIC_ENDPOINT);
 }
 
 fn motor_from_tag<'a>(tag: &str) -> Option<MotorId<'a>> {
@@ -296,7 +299,7 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
                     .or_insert(HashMap::new())
                     .insert(motor.feature_index, intensity);
             }
-            None => eprintln!("Ignoring unknown motor tag {}", tag)
+            None => eprintln!("{}: ignoring unknown motor tag {}", LOG_PREFIX_HAPTIC_ENDPOINT, tag)
         };
     };
 
