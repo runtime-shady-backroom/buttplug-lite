@@ -130,7 +130,7 @@ async fn main() {
             // Some(haptic_client).connected() == false // reconnect needed
             // in summary, we don't care what the state is and we (re)connect regardless
             connect_to_haptic_server(haptic_client_db.clone()).await; // will "block" until disconnect
-            tokio::time::delay_for(Duration::from_millis(HAPTIC_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
+            tokio::time::sleep(Duration::from_millis(HAPTIC_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
         }
     });
 
@@ -144,15 +144,17 @@ async fn main() {
 // returns only when we disconnect from the server
 async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
     let mut haptic_client_mutex = haptic_client_db.write().await;
-    let haptic_client = ButtplugRemoteClientConnector::<
+    let haptic_connector = ButtplugRemoteClientConnector::<
         ButtplugWebsocketClientTransport,
         ButtplugClientJSONSerializer,
     >::new(ButtplugWebsocketClientTransport::new_insecure_connector(
         HAPTIC_SERVER_ADDRESS,
     ));
-    match ButtplugClient::connect(HAPTIC_SERVER_CLIENT_NAME, haptic_client).await {
-        Ok((haptic_client, mut haptic_events)) => {
+    let haptic_client = ButtplugClient::new(HAPTIC_SERVER_CLIENT_NAME);
+    match haptic_client.connect(haptic_connector).await {
+        Ok(()) => {
             println!("{}: Intiface connected!", LOG_PREFIX_HAPTIC_SERVER);
+            let mut event_stream = haptic_client.event_stream();
             match haptic_client.start_scanning().await {
                 Ok(()) => println!("{}: starting device scan", LOG_PREFIX_HAPTIC_SERVER),
                 Err(e) => eprintln!("{}: scan failure: {:?}", LOG_PREFIX_HAPTIC_SERVER, e)
@@ -161,13 +163,14 @@ async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
             drop(haptic_client_mutex); // prevent this section from requiring two locks
             loop {
                 println!("{}: waiting for event...", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove when done debugging deadlock
-                match haptic_events.next().await {
+                match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => println!("{}: device connected: {}", LOG_PREFIX_HAPTIC_SERVER, dev.name),
                         ButtplugClientEvent::DeviceRemoved(dev) => println!("{}: device disconnected: {}", LOG_PREFIX_HAPTIC_SERVER, dev.name),
                         ButtplugClientEvent::PingTimeout => println!("{}: ping timeout", LOG_PREFIX_HAPTIC_SERVER),
                         ButtplugClientEvent::Error(e) => println!("{}: server error: {:?}", LOG_PREFIX_HAPTIC_SERVER, e),
                         ButtplugClientEvent::ScanningFinished => println!("{}: device scan finished", LOG_PREFIX_HAPTIC_SERVER),
+                        ButtplugClientEvent::ServerConnect => println!("{}: server connected", LOG_PREFIX_HAPTIC_SERVER),
                         ButtplugClientEvent::ServerDisconnect => {
                             println!("{}: server disconnected", LOG_PREFIX_HAPTIC_SERVER);
                             let mut haptic_client_mutex = haptic_client_db.write().await;
@@ -197,7 +200,7 @@ async fn haptic_status_handler(haptic_client: HapticClientDb) -> Result<impl war
             let mut string = String::from(format!("intiface connected={}", connected));
             for device in haptic_client.devices() {
                 string.push_str(format!("\n  {}", device.name).as_str());
-                for (message_type, attributes) in device.allowed_messages {
+                for (message_type, attributes) in device.allowed_messages.iter() {
                     string.push_str(format!("\n    {:?}: {:?}", message_type, attributes).as_str());
                 }
             }
