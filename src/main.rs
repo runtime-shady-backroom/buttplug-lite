@@ -339,7 +339,7 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
             None => return Err(format!("could not extract motor intensity from {}", line))
         };
         let intensity = match intensity.parse::<f64>() {
-            Ok(f) => f,
+            Ok(f) => clamp(f),
             Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
         };
         match motor_from_tag(tag) {
@@ -355,4 +355,14 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
 
     // Ok(&mut devices)
     Ok(devices)
+}
+
+fn clamp(f: f64) -> f64 {
+    if f < 0.0 {
+        0.0
+    } else if f > 1.0 {
+        1.0
+    } else {
+        f
+    }
 }
