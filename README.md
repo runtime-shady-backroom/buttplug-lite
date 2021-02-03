@@ -30,6 +30,11 @@ This application provides a proxy around the [intiface](https://intiface.com/des
 | `n` | Lovense Nora | Vibration (needs confirmation)
 | `r` | Lovense Nora | Rotation (needs confirmation)
 
+
+## Integrations
+### Neos VR
+A template is available in this public folder: `neosrec:///U-runtime/R-1d65fb20-ab7b-46c1-89eb-90d176309ec2` (paste that link in-game to spawn it)
+
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/intiface-proxy/releases/latest).
 2. Simply run intiface-proxy.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs and kill the process easily. If you run it directly you will have to kill it from task manager, as there is no GUI.
