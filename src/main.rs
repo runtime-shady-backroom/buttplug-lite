@@ -6,19 +6,15 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use buttplug::{
     client::{ButtplugClient, ButtplugClientEvent, device::VibrateCommand},
-    connector::{ButtplugRemoteClientConnector, ButtplugWebsocketClientTransport},
-    core::messages::serializer::ButtplugClientJSONSerializer,
+    server::ButtplugServerOptions
 };
 use futures::StreamExt;
 use tokio::sync::{Mutex, RwLock};
 use warp::Filter;
-use warp::http::{Response, StatusCode};
 
 // global state types
 type WatchdogTimeoutDb = Arc<Mutex<Option<i64>>>;
 type HapticClientDb = Arc<RwLock<Option<ButtplugClient>>>;
-
-const EMPTY_STRING: String = String::new();
 
 // how often the watchdog runs its check
 const WATCHDOG_POLL_INTERVAL_MILLIS: u64 = 1000;
@@ -29,11 +25,8 @@ const WATCHDOG_TIMEOUT_MILLIS: i64 = 10000;
 // how long to wait before attempting a reconnect to the server
 const HAPTIC_SERVER_RECONNECT_DELAY_MILLIS: u64 = 5000;
 
-// name of this client from intiface's perspective
-const HAPTIC_SERVER_CLIENT_NAME: &str = "intiface-proxy";
-
-// intiface url
-const HAPTIC_SERVER_ADDRESS: &str = "ws://127.0.0.1:12345";
+// name of this client from the buttplug.io server's perspective
+const HAPTIC_SERVER_CLIENT_NAME: &str = "client";
 
 // log prefixes:
 const LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
@@ -60,13 +53,6 @@ async fn main() {
         .and(with_db(haptic_client_db.clone()))
         .and_then(haptic_status_handler);
 
-    // POST /hapticscan => 200 OK with empty body
-    let hapticscan = warp::path("hapticscan")
-        .and(warp::post())
-        .and(warp::body::content_length_limit(0))
-        .and(with_db(haptic_client_db.clone()))
-        .and_then(haptic_scan_handler);
-
     // WEBSOCKET /haptic
     let haptic = warp::path("haptic")
         .and(warp::ws())
@@ -77,7 +63,6 @@ async fn main() {
         });
 
     let routes = hapticstatus
-        .or(hapticscan)
         .or(haptic);
 
     // this is needed in both the watchdog and reconnect background tasks,
@@ -129,7 +114,7 @@ async fn main() {
             // Some(haptic_client).connected() == true // bad state, reconnect anyway
             // Some(haptic_client).connected() == false // reconnect needed
             // in summary, we don't care what the state is and we (re)connect regardless
-            connect_to_haptic_server(haptic_client_db.clone()).await; // will "block" until disconnect
+            start_haptic_server(haptic_client_db.clone()).await; // will "block" until disconnect
             tokio::time::sleep(Duration::from_millis(HAPTIC_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
         }
     });
@@ -140,20 +125,14 @@ async fn main() {
         .await;
 }
 
-// connect to an intiface server, then while connected process events
+// start server, then while running process events
 // returns only when we disconnect from the server
-async fn connect_to_haptic_server(haptic_client_db: HapticClientDb) {
+async fn start_haptic_server(haptic_client_db: HapticClientDb) {
     let mut haptic_client_mutex = haptic_client_db.write().await;
-    let haptic_connector = ButtplugRemoteClientConnector::<
-        ButtplugWebsocketClientTransport,
-        ButtplugClientJSONSerializer,
-    >::new(ButtplugWebsocketClientTransport::new_insecure_connector(
-        HAPTIC_SERVER_ADDRESS,
-    ));
     let haptic_client = ButtplugClient::new(HAPTIC_SERVER_CLIENT_NAME);
-    match haptic_client.connect(haptic_connector).await {
+    match haptic_client.connect_in_process(&ButtplugServerOptions::default()).await {
         Ok(()) => {
-            println!("{}: Intiface connected!", LOG_PREFIX_HAPTIC_SERVER);
+            println!("{}: Device server started!", LOG_PREFIX_HAPTIC_SERVER);
             let mut event_stream = haptic_client.event_stream();
             match haptic_client.start_scanning().await {
                 Ok(()) => println!("{}: starting device scan", LOG_PREFIX_HAPTIC_SERVER),
@@ -197,7 +176,7 @@ async fn haptic_status_handler(haptic_client: HapticClientDb) -> Result<impl war
     match haptic_client_mutex.as_ref() {
         Some(haptic_client) => {
             let connected = haptic_client.connected();
-            let mut string = String::from(format!("intiface connected={}", connected));
+            let mut string = String::from(format!("device server running={}", connected));
             for device in haptic_client.devices() {
                 string.push_str(format!("\n  {}", device.name).as_str());
                 for (message_type, attributes) in device.allowed_messages.iter() {
@@ -206,21 +185,7 @@ async fn haptic_status_handler(haptic_client: HapticClientDb) -> Result<impl war
             }
             Ok(string)
         }
-        None => Ok(String::from("intiface connected=None"))
-    }
-}
-
-// trigger a device scan
-async fn haptic_scan_handler(haptic_client: HapticClientDb) -> Result<impl warp::Reply, warp::Rejection> {
-    let haptic_client_mutex = haptic_client.read().await;
-    match haptic_client_mutex.as_ref() {
-        Some(haptic_client) => {
-            match haptic_client.start_scanning().await {
-                Ok(()) => Ok(Response::builder().status(StatusCode::OK).body(EMPTY_STRING)),
-                Err(e) => Ok(Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(format!("{:?}", e)))
-            }
-        }
-        None => Ok(Response::builder().status(StatusCode::SERVICE_UNAVAILABLE).body(format!("intiface not connected")))
+        None => Ok(String::from("device server running=None"))
     }
 }
 

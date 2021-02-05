@@ -1,6 +1,6 @@
 [package]
 name = "intiface-proxy"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 edition = "2018"
 
@@ -10,4 +10,4 @@ edition = "2018"
 tokio = { version = "1.0", features = ["full"] }
 warp = "0.3" # uses tokio 1.0
 futures = { version = "0.3", default-features = false }
-buttplug = { version = "2.0", features = ["websockets"] } # uses tokio 1.0.2
+buttplug = { version = "2.0", features = ["thread-pool-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager"] } # uses tokio 1.1.0

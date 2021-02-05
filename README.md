@@ -1,17 +1,20 @@
-# Intiface Proxy
-This application provides a proxy around the [intiface](https://intiface.com/desktop/) websocket that significantly simplifies the [Buttplug Sex Device Control Standard](https://buttplug-spec.docs.buttplug.io/). This allows data sources to send commands to devices with significantly less programming and makes integration more feasible in environments when complex protocol implementations are difficult or impossible to implement.
+# Buttplug Lite
+This application serves a websocket that runs a dramatically simplified version of the [Buttplug Sex Device Control Standard](https://buttplug-spec.docs.buttplug.io/) protocol. This allows commands to be sent to devices with significantly less programming, making integration feasible in more restricted environments where the buttplug.io protocol is difficult or impossible to implement.
 
 ## Features
 - Extremely simple fire-and-forget protocol
-- Automatic reconnection to intiface
 
 ### Planned Features
-- Configuration file
-  - Specify server addresses
-  - Replace hardcoded motor tags with user config
-- GUI maybe? Or do I just make people deal with CLI?
+- **Rename the project to better reflect what it currently does**
+- GUI
+  - show status
+  - configuration
+    - Specify server addresses
+    - Replace hardcoded motor tags with user config
 
 ## Supported Devices
+A future version will allow the user to configure any [buttplug.io supported device](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7). The current version has hardcoded support for the following:
+
 - Lovense Edge
 - Lovense Hush
 - Lovense Lush
@@ -75,8 +78,4 @@ Motors will continue running at the strength last commanded until another update
 If no command is received for 10 seconds, intiface-proxy will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
 
 ### Checking the Status
-Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed.
-
-
-### Forcing a Device Scan
-Send an HTTP POST to `http://127.0.0.1:3031/hapticscan` with an empty body. A 200 OK will be returned once the scan is initiated successfully. Forced device scans should not be required, but the route has been left in for testing.
+Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status open an issue.
