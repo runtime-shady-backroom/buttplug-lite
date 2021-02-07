@@ -6,11 +6,17 @@ This application serves a websocket that runs a dramatically simplified version 
 
 ### Planned Features
 - **Rename the project to better reflect what it currently does**
+- configuration
+  - Specify server address
+    - do I force you to restart, or support changing bind address live?
+  - Replace hardcoded motor tags with user config
+  - serialize/deserialize
 - GUI
-  - show status
-  - configuration
-    - Specify server addresses
-    - Replace hardcoded motor tags with user config
+  - show status of devices
+  - drive motor config live
+- API
+  - device status/battery/signal strength?
+- duplicate device support?
 
 ## Supported Devices
 A future version will allow the user to configure any [buttplug.io supported device](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7). The current version has hardcoded support for the following:
