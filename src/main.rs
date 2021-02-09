@@ -1,31 +1,36 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-use buttplug::client::{ButtplugClient, ButtplugClientEvent, device::VibrateCommand};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, device::VibrateCommand};
 use buttplug::connector::ButtplugInProcessClientConnector;
 use buttplug::server::comm_managers::{
     btleplug::BtlePlugCommunicationManager,
     lovense_dongle::{LovenseHIDDongleCommunicationManager, LovenseSerialDongleCommunicationManager},
     xinput::XInputDeviceCommunicationManager,
 };
-use druid::{AppLauncher, Widget, WindowDesc};
-use druid::widget::Label;
 use futures::StreamExt;
-use tokio::sync::{Mutex, oneshot, RwLock};
+use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
+use tokio::task;
 use warp::Filter;
 
+use configuration::Configuration;
+
+use crate::configuration::{ConfigurationDb, Motor, MotorType};
+use crate::watchdog::WatchdogTimeoutDb;
+use app_dirs::{AppInfo, AppDataType};
+use std::fs;
+
+mod configuration;
+mod watchdog;
+mod gui;
+mod util;
+
 // global state types
-type WatchdogTimeoutDb = Arc<Mutex<Option<i64>>>;
-type HapticConnectorDb = Arc<RwLock<Option<HapticConnector>>>;
-
-// how often the watchdog runs its check
-const WATCHDOG_POLL_INTERVAL_MILLIS: u64 = 1000;
-
-// halt devices after this much time with no command received
-const WATCHDOG_TIMEOUT_MILLIS: i64 = 10000;
+pub type HapticConnectorDb = Arc<RwLock<Option<HapticConnector>>>;
 
 // how long to wait before attempting a reconnect to the server
 const HAPTIC_SERVER_RECONNECT_DELAY_MILLIS: u64 = 5000;
@@ -37,29 +42,53 @@ const HAPTIC_SERVER_CLIENT_NAME: &str = "in-process-client";
 const LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
 const LOG_PREFIX_HAPTIC_SERVER: &str = "haptic_server";
 
-// encodes the "address" of a specific motor
-struct MotorId<'a> {
-    device_name: &'a str,
-    feature_index: u32,
-}
+const APP_INFO: AppInfo = AppInfo {
+    name: env!("CARGO_PKG_NAME"),
+    author: "runtime"
+};
 
 // eventually I'd like some way to get a ref to the server in here
-struct HapticConnector {
-    client: ButtplugClient,
+pub struct HapticConnector {
+    pub client: ButtplugClient,
 }
 
-fn build_ui() -> impl Widget<()> {
-    Label::new("Hello world")
+#[derive(Debug)]
+pub enum ShutdownMessage {
+    Restart,
+    Shutdown,
 }
 
 #[tokio::main]
 async fn main() {
     println!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-    let proxy_server_address: SocketAddr = ([127, 0, 0, 1], 3031).into();
-
     let haptic_watchdog_db: WatchdogTimeoutDb = Arc::new(Mutex::new(None));
     let haptic_connector_db: HapticConnectorDb = Arc::new(RwLock::new(None));
+
+    let config_dir_path = app_dirs::get_app_root(AppDataType::UserConfig, &APP_INFO).expect("unable to locate configuration directory");
+    fs::create_dir_all(config_dir_path.as_path()).expect("failed to create configuration directory");
+    let config_file_path = config_dir_path.join("config.toml");
+
+    let loaded_configuration = fs::read_to_string(config_file_path.as_path())
+        .map_err(|e| format!("{:?}", e))
+        .and_then(|string| toml::from_str(string.borrow()).map_err(|e| format!("{:?}", e)));
+    let configuration = match loaded_configuration {
+        Ok(configuration) => configuration,
+        Err(e) => {
+            //TODO: do not clobber old config when read fails
+            eprintln!("falling back to default config due to error: {}", e);
+            Configuration::default()
+        }
+    };
+
+    //TODO: move config saving elsewhere
+    let serialized_config = toml::to_string(&configuration).expect("failed to serialize configuration");
+    fs::write(config_file_path, serialized_config).expect("failed to save configuration");
+
+    println!("{:?}", configuration);
+
+    let proxy_server_address: SocketAddr = ([127, 0, 0, 1], configuration.port).into();
+    let configuration_db: ConfigurationDb = Arc::new(RwLock::new(configuration));
 
     // GET /hapticstatus => 200 OK with body containing haptic status
     let hapticstatus = warp::path("hapticstatus")
@@ -72,50 +101,15 @@ async fn main() {
         .and(warp::ws())
         .and(with_db(haptic_connector_db.clone()))
         .and(with_db(haptic_watchdog_db.clone()))
-        .map(|ws: warp::ws::Ws, haptic_connector_db: HapticConnectorDb, watchdog_timestamp: WatchdogTimeoutDb| {
-            ws.on_upgrade(|ws| haptic_handler(ws, haptic_connector_db, watchdog_timestamp))
+        .and(with_db(configuration_db))
+        .map(|ws: warp::ws::Ws, haptic_connector_db: HapticConnectorDb, haptic_watchdog_db: WatchdogTimeoutDb, configuration_db: ConfigurationDb| {
+            ws.on_upgrade(|ws| haptic_handler(ws, haptic_connector_db, haptic_watchdog_db, configuration_db))
         });
 
     let routes = hapticstatus
         .or(haptic);
 
-    // connector clone moved into watchdog task
-    let watchdog_haptic_connector_clone = haptic_connector_db.clone();
-
-    // spawn the watchdog task
-    // if too much time passes with no input from the client, this halts all haptic devices
-    tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(WATCHDOG_POLL_INTERVAL_MILLIS));
-        loop {
-            interval.tick().await;
-            let unix_time = SystemTime::now().duration_since(UNIX_EPOCH)
-                .expect("Your system clock is wrong")
-                .as_millis();
-            let unix_time = i64::try_from(unix_time).expect("System time out of range");
-            // probably fine to panic if your system clock is before the unix epoch...
-
-            let mut watchdog_time_mutex = haptic_watchdog_db.lock().await;
-            let watchdog_violation = match *watchdog_time_mutex {
-                Some(watchdog_time) => unix_time - watchdog_time > WATCHDOG_TIMEOUT_MILLIS,
-                None => false
-            };
-            if watchdog_violation {
-                println!("Watchdog violation! Halting all devices. To avoid this send an update at least every {}ms.", WATCHDOG_TIMEOUT_MILLIS);
-                *watchdog_time_mutex = None; // this prevents the message from spamming
-                drop(watchdog_time_mutex); // prevent this section from requiring two locks
-                let haptic_connector_mutex = watchdog_haptic_connector_clone.read().await;
-                match haptic_connector_mutex.as_ref() {
-                    Some(haptic_connector) => {
-                        match haptic_connector.client.stop_all_devices().await {
-                            Ok(()) => (),
-                            Err(e) => eprintln!("watchdog: error halting devices: {:?}", e)
-                        }
-                    }
-                    None => () // do nothing because there is no server connected
-                }
-            }
-        }
-    });
+    watchdog::start(haptic_watchdog_db, haptic_connector_db.clone());
 
     // connector clone moved into reconnect task
     let reconnector_haptic_connector_clone = haptic_connector_db.clone();
@@ -123,7 +117,7 @@ async fn main() {
     // spawn the server reconnect task
     // when the server is connected this functions as the event reader
     // when the server is disconnected it attempts to reconnect after a delay
-    tokio::task::spawn(async move {
+    task::spawn(async move {
         loop {
             // possible states of server (haptic_client_db.lock().await):
             // None // need to perform initial connection
@@ -135,39 +129,57 @@ async fn main() {
         }
     });
 
-    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    tokio::task::spawn_blocking(|| {
-        AppLauncher::with_window(WindowDesc::new(build_ui)).launch(()).unwrap();
+    let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel::<ShutdownMessage>();
 
-        match shutdown_tx.send(()) {
-            Ok(()) => println!("shutdown triggered"),
-            Err(()) => panic!("Error triggering shutdown")
-        };
+    task::spawn_blocking(move || {
+        gui::run(shutdown_tx); // blocking call
     });
 
-    let server = warp::serve(routes)
-        .try_bind_with_graceful_shutdown(proxy_server_address, async {
-            if let Err(e) = shutdown_rx.await {
-                eprintln!("Error waiting for shutdown trigger: {}", e);
-            }
-        });
+    // loop handles restarting the warp server if needed
+    loop {
+        // used to proxy the signal from the mpsc into the graceful_shutdown closure later
+        // this is needed because we cannot move the mpsc consumer
+        let (oneshot_tx, oneshot_rx) = oneshot::channel::<()>();
 
-    match server {
-        Ok((addr, future)) => {
-            println!("starting web server on {}", addr);
-            future.await; // sacrifice the main thread to warp
+        let server = warp::serve(routes.clone())
+            .try_bind_with_graceful_shutdown(proxy_server_address, async move {
+                oneshot_rx.await.expect("error receiving shutdown signal");
+            });
+
+        let shutdown_message = match server {
+            Ok((address, warp_future)) => {
+                println!("starting web server on {}", address);
+
+                // run warp in the background
+                task::spawn(async move {
+                    warp_future.await;
+                });
+
+                // sacrifice main thread to shutdown trigger bullshit
+                let signal = shutdown_rx.recv().await.unwrap_or(ShutdownMessage::Shutdown);
+                oneshot_tx.send(()).expect("error transmitting shutdown signal");
+                signal
+            }
+            Err(e) => {
+                eprintln!("Failed to start web server: {:?}", e);
+                ShutdownMessage::Shutdown
+            }
+        };
+
+        if let ShutdownMessage::Shutdown = shutdown_message {
+            break;
         }
-        Err(e) => eprintln!("Failed to start web server: {:?}", e)
+        // otherwise we go again
     }
 
-    // at this point we being cleaning up resources for shutdown
+    // at this point we begin cleaning up resources for shutdown
     println!("shutting down...");
 
     let haptic_connector_mutex = haptic_connector_db.read().await;
     if let Some(connector) = haptic_connector_mutex.as_ref() {
-        connector.client.stop_scanning().await.expect("failed to stop scanning before exit");
         connector.client.stop_all_devices().await.expect("failed to halt devices before exit");
+        connector.client.stop_scanning().await.expect("failed to stop scanning before exit");
         connector.client.disconnect().await.expect("failed to disconnect from internal haptic server");
     }
 }
@@ -184,6 +196,7 @@ async fn start_haptic_server(haptic_connector_db: HapticConnectorDb) {
     server.add_comm_manager::<BtlePlugCommunicationManager>().unwrap();
     server.add_comm_manager::<LovenseHIDDongleCommunicationManager>().unwrap();
     server.add_comm_manager::<LovenseSerialDongleCommunicationManager>().unwrap();
+
     #[cfg(target_os = "windows")] {
         server.add_comm_manager::<XInputDeviceCommunicationManager>().unwrap();
     }
@@ -199,7 +212,6 @@ async fn start_haptic_server(haptic_connector_db: HapticConnectorDb) {
             *haptic_connector_mutex = Some(HapticConnector { client: haptic_client });
             drop(haptic_connector_mutex); // prevent this section from requiring two locks
             loop {
-                println!("{}: waiting for event...", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove when done debugging deadlock
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => println!("{}: device connected: {}", LOG_PREFIX_HAPTIC_SERVER, dev.name),
@@ -212,7 +224,6 @@ async fn start_haptic_server(haptic_connector_db: HapticConnectorDb) {
                             println!("{}: server disconnected", LOG_PREFIX_HAPTIC_SERVER);
                             let mut haptic_connector_mutex = haptic_connector_db.write().await;
                             *haptic_connector_mutex = None; // not strictly required but will give more sane error messages
-                            println!("{}: didn't deadlock!", LOG_PREFIX_HAPTIC_SERVER); //TODO: remove when done debugging deadlock
                             break;
                         }
                     },
@@ -226,6 +237,40 @@ async fn start_haptic_server(haptic_connector_db: HapticConnectorDb) {
 
 fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=std::convert::Infallible> + Clone {
     warp::any().map(move || db.clone())
+}
+
+pub async fn get_devices(haptic_connector_db: &HapticConnectorDb) -> Vec<Motor> {
+    let haptic_connector_mutex = haptic_connector_db.read().await;
+    match haptic_connector_mutex.as_ref() {
+        Some(haptic_connector) => {
+            haptic_connector.client.devices().into_iter()
+                .flat_map(|device| {
+                    MotorType::iter()
+                        .flat_map(move |feature_type| {
+                            let device_name = device.name.clone();
+                            let feature_count = device_feature_count_by_type(feature_type, device.borrow());
+                            let feature_range = 0..feature_count;
+                            feature_range.into_iter()
+                                .map(move |feature_index| {
+                                    Motor {
+                                        device_name: device_name.clone(),
+                                        feature_index,
+                                        feature_type: feature_type.clone(),
+                                    }
+                                })
+                        })
+                })
+                .collect()
+        }
+        None => Default::default()
+    }
+}
+
+fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClientDevice) -> u32 {
+    device.allowed_messages.get(device_type.get_type().borrow())
+        .map(|attributes| attributes.feature_count)
+        .flatten()
+        .unwrap_or(0)
 }
 
 // return a device status summary
@@ -248,7 +293,12 @@ async fn haptic_status_handler(haptic_connector_db: HapticConnectorDb) -> Result
 }
 
 // haptic websocket handler
-async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_connector_db: HapticConnectorDb, watchdog_time: WatchdogTimeoutDb) {
+async fn haptic_handler(
+    websocket: warp::ws::WebSocket,
+    haptic_connector_db: HapticConnectorDb,
+    watchdog_time: WatchdogTimeoutDb,
+    configuration_db: ConfigurationDb,
+) {
     println!("{}: client connected", LOG_PREFIX_HAPTIC_ENDPOINT);
     let (_, mut rx) = websocket.split();
     while let Some(result) = rx.next().await {
@@ -281,8 +331,11 @@ async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_connector_db: Hap
                 continue;
             }
         };
+        let configuration_mutex = configuration_db.read().await;
+        let haptic_map = build_haptic_map(configuration_mutex.deref(), message);
+        drop(configuration_mutex);
 
-        let mut map = match build_haptic_map(message) {
+        let mut map = match haptic_map {
             Ok(map) => map,
             Err(e) => {
                 eprintln!("{}: error parsing command: {}", LOG_PREFIX_HAPTIC_ENDPOINT, e);
@@ -305,33 +358,12 @@ async fn haptic_handler(websocket: warp::ws::WebSocket, haptic_connector_db: Hap
                     };
                 }
                 drop(haptic_connector_mutex); // prevent this section from requiring two locks
-
-                // feed the watchdog
-                let mut watchdog_time_mutex = watchdog_time.lock().await;
-                let unix_time = SystemTime::now().duration_since(UNIX_EPOCH)
-                    .expect("Your system clock is wrong")
-                    .as_millis();
-                *watchdog_time_mutex = Some(i64::try_from(unix_time).expect("System time out of range"));
-                // probably fine to panic if your system clock is before the unix epoch...
+                watchdog::feed(&watchdog_time).await;
             }
             None => () // no server connected, so send no commands
         }
     }
     println!("{}: client connection lost", LOG_PREFIX_HAPTIC_ENDPOINT);
-}
-
-// convert a tag into a full motor id
-fn motor_from_tag<'a>(tag: &str) -> Option<MotorId<'a>> {
-    match tag {
-        "o" => Some(MotorId { device_name: "Lovense Edge", feature_index: 0 }), // edge outer (verified)
-        "i" => Some(MotorId { device_name: "Lovense Edge", feature_index: 1 }), // edge inner (verified)
-        "h" => Some(MotorId { device_name: "Lovense Hush", feature_index: 0 }), // hush
-        "l" => Some(MotorId { device_name: "Lovense Lush", feature_index: 0 }), // lush 2
-        "m" => Some(MotorId { device_name: "Lovense Max", feature_index: 0 }), // max 2 (suction not supported)
-        "n" => Some(MotorId { device_name: "Lovense Nora", feature_index: 0 }), // nora vibration (needs verification)
-        "r" => Some(MotorId { device_name: "Lovense Nora", feature_index: 1 }), // nora rotation (needs verification)
-        _ => None
-    }
 }
 
 /* convert a command into a tree structure more usable by the Buttplug api
@@ -348,8 +380,8 @@ fn motor_from_tag<'a>(tag: &str) -> Option<MotorId<'a>> {
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, String> {
-    let mut devices: HashMap<&str, HashMap<u32, f64>> = HashMap::new();
+fn build_haptic_map(configuration: &Configuration, command: &str) -> Result<HashMap<String, HashMap<u32, f64>>, String> {
+    let mut devices: HashMap<String, HashMap<u32, f64>> = HashMap::new();
 
     for line in command.split(';') {
         let mut split_line = line.split(':');
@@ -362,15 +394,19 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
             None => return Err(format!("could not extract motor intensity from {}", line))
         };
         let intensity = match intensity.parse::<f64>() {
-            Ok(f) => clamp(f),
+            Ok(f) => util::clamp(f),
             Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
         };
-        match motor_from_tag(tag) {
+        match configuration.motor_from_tag(tag.to_owned().borrow()) {
             Some(motor) => {
-                // make a new submap if needed
-                devices.entry(motor.device_name)
-                    .or_insert(HashMap::new())
-                    .insert(motor.feature_index, intensity);
+                if let MotorType::Vibration = motor.feature_type {
+                    // make a new submap if needed
+                    devices.entry(motor.device_name.clone())
+                        .or_insert(HashMap::new())
+                        .insert(motor.feature_index, intensity);
+                } else {
+                    eprintln!("{}: ignoring tag {} because only vibration is supported presently", LOG_PREFIX_HAPTIC_ENDPOINT, tag)
+                }
             }
             None => eprintln!("{}: ignoring unknown motor tag {}", LOG_PREFIX_HAPTIC_ENDPOINT, tag)
         };
@@ -378,14 +414,4 @@ fn build_haptic_map(command: &str) -> Result<HashMap<&str, HashMap<u32, f64>>, S
 
     // Ok(&mut devices)
     Ok(devices)
-}
-
-fn clamp(f: f64) -> f64 {
-    if f < 0.0 {
-        0.0
-    } else if f > 1.0 {
-        1.0
-    } else {
-        f
-    }
 }

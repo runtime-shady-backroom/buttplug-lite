@@ -17,6 +17,7 @@ This application serves a websocket that runs a dramatically simplified version 
 - API
   - device status/battery/signal strength?
 - duplicate device support?
+- integrate a logging framework
 
 ## Supported Devices
 A future version will allow the user to configure any [buttplug.io supported device](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7). The current version has hardcoded support for the following:
@@ -46,7 +47,7 @@ A template is available in this public folder: `neosrec:///U-runtime/R-1d65fb20-
 
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/intiface-proxy/releases/latest).
-2. Simply run intiface-proxy.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs and kill the process easily. If you run it directly you will have to kill it from task manager, as there is no GUI.
+2. Simply run buttplug-lite.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs and kill the process easily. If you run it directly you will have to kill it from task manager, as there is no GUI.
 
 ### Sending Commands
 Send text messages to `ws://127.0.0.1:3031/haptic`.
@@ -81,7 +82,7 @@ This will drive a Lovense Edge's inner and outer motors at the indicated levels.
 #### Motor State
 Motors will continue running at the strength last commanded until another update is received.
 
-If no command is received for 10 seconds, intiface-proxy will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
+If no command is received for 10 seconds, buttplug-lite will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
 
 ### Checking the Status
 Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status open an issue.

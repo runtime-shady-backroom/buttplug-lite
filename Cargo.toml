@@ -1,5 +1,5 @@
 [package]
-name = "intiface-proxy"
+name = "buttplug-lite"
 version = "0.4.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 edition = "2018"
@@ -7,8 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "^1.1", features = ["full"] }
-warp = "0.3" # uses tokio 1.0
-futures = { version = "0.3", default-features = false }
-buttplug = { version = "^2.0", default-features = false, features = ["thread-pool-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager"] } # uses tokio 1.1.0
-druid = "0.7"
+tokio = { version = "^1.0.0", features = ["full"] }
+warp = "~0.3.0" # uses tokio 1.0
+futures = { version = "~0.3.0", default-features = false }
+buttplug = { version = "^2.1.2", default-features = false, features = ["thread-pool-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager"] } # uses tokio 1.1.0
+druid = "~0.7.0"
+serde = "^1.0.0"
+toml = "~0.5.0"
+app_dirs = "^1.2.1"
