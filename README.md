@@ -3,43 +3,13 @@ This application serves a websocket that runs a dramatically simplified version 
 
 ## Features
 - Extremely simple fire-and-forget protocol
+- Standalone application requiring no other software
 
-### Planned Features
-- **Rename the project to better reflect what it currently does**
-- configuration
-  - Specify server address
-    - do I force you to restart, or support changing bind address live?
-  - Replace hardcoded motor tags with user config
-  - serialize/deserialize
-- GUI
-  - show status of devices
-  - drive motor config live
-- API
-  - device status/battery/signal strength?
-- duplicate device support?
-- integrate a logging framework
+![screenshot of GUI](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/intiface-proxy/images/buttplug-lite-0.4.0.png)
+
 
 ## Supported Devices
-A future version will allow the user to configure any [buttplug.io supported device](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7). The current version has hardcoded support for the following:
-
-- Lovense Edge
-- Lovense Hush
-- Lovense Lush
-- Lovense Max
-- Lovense Nora (need confirmation I don't have the motors flipped)
-
-### Motor Tags
-| Tag | Device       | Motor
-| --- | ------------ | -----
-| `i` | Lovense Edge | Inner
-| `o` | Lovense Edge | Outer
-| `h` | Lovense Hush | *only has one motor*
-| `l` | Lovense Lush | *only has one motor*
-| `m` | Lovense Max  | Vibration
-|     | Lovense Max  | ~~Suction~~ **currently unsupported**
-| `n` | Lovense Nora | Vibration (needs confirmation)
-| `r` | Lovense Nora | Rotation (needs confirmation)
-
+All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work. Currently only vibration is supported. Rotatation and linear drives will come soon, and will require additions to the protocol.
 
 ## Integrations
 ### Neos VR
@@ -47,15 +17,18 @@ A template is available in this public folder: `neosrec:///U-runtime/R-1d65fb20-
 
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/intiface-proxy/releases/latest).
-2. Simply run buttplug-lite.exe. I recommend you launch it from a shell (e.g. command prompt or powershell) so that you can see the logs and kill the process easily. If you run it directly you will have to kill it from task manager, as there is no GUI.
+2. Run buttplug-lite.exe.
+3. Press the "refresh devices" button to update the UI with all currently connected devices.
+4. Add tags for the devices you plan to use.
+5. Press "apply configuration" to save your settings and apply them to the current server.
 
 ### Sending Commands
-Send text messages to `ws://127.0.0.1:3031/haptic`.
+Send text-type messages to `ws://127.0.0.1:3031/haptic`. Binary-type messages are not currently supported. Commands should be sent at most at a 10hz rate. Beyond that application performance may begin to degrade.
 
 #### Message Format
 The message format is a list of semicolon (`;`) delimited motor commands. Each motor command is a tag followed by a colon (`:`) followed by a floating-point number representing desired motor strength. Motor strength floats should be in the range [0, 1], and are represented internally using 64 bits.
 
-##### An Arbitrary Example
+##### An Example Command
 
 | Tag | Strength
 | --- | ---
@@ -66,18 +39,6 @@ The message format is a list of semicolon (`;`) delimited motor commands. Each m
 ```
 foo:0;bar:0.3;baz:0.99
 ```
-
-##### A Practical Example
-| Description | Tag | Strength
-| ----------- | --- | ---
-| Edge Inner  | i   | 0.25
-| Edge Outer  | o   | 0.75
-
-```
-i:0.25;o:0.75
-```
-
-This will drive a Lovense Edge's inner and outer motors at the indicated levels.
 
 #### Motor State
 Motors will continue running at the strength last commanded until another update is received.
