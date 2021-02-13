@@ -1,18 +1,16 @@
 use core::slice::Iter;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
 use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 use crate::configuration::MotorType::Vibration;
 
 const DEFAULT_PORT: u16 = 3031;
 
-pub type ConfigurationDb = Arc<RwLock<Configuration>>;
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Configuration {
     pub port: u16,
     pub tags: HashMap<String, Motor>,
@@ -28,20 +26,23 @@ impl Default for Configuration {
     fn default() -> Self {
         Configuration {
             port: DEFAULT_PORT,
-            tags: [
-                ("o".into(), Motor { device_name: "Lovense Edge".into(), feature_index: 0, feature_type: Vibration }),
-                ("i".into(), Motor { device_name: "Lovense Edge".into(), feature_index: 1, feature_type: Vibration }),
-            ].iter().cloned().collect(), // TODO: replace with Default::default()
+            tags: Default::default(),
         }
     }
 }
 
 // encodes the "address" of a specific motor
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Motor {
     pub device_name: String,
-    pub feature_index: u32,
     pub feature_type: MotorType,
+    pub feature_index: u32,
+}
+
+impl Display for Motor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}#{}", self.device_name, self.feature_type, self.feature_index)
+    }
 }
 
 const MOTOR_TYPES: [MotorType; 3] = [
@@ -50,11 +51,11 @@ const MOTOR_TYPES: [MotorType; 3] = [
     MotorType::Rotation,
 ];
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum MotorType {
-    Vibration,
     Linear,
     Rotation,
+    Vibration,
 }
 
 impl MotorType {
@@ -68,5 +69,15 @@ impl MotorType {
 
     pub fn iter<'a>() -> Iter<'a, MotorType> {
         MOTOR_TYPES.iter()
+    }
+}
+
+impl Display for MotorType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            MotorType::Linear => write!(f, "linear"),
+            MotorType::Rotation => write!(f, "rotation"),
+            Vibration => write!(f, "vibration"),
+        }
     }
 }
