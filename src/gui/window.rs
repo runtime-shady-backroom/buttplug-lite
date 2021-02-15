@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{Application, button, Button, Column, Command, Container, Element, HorizontalAlignment, Length, Row, scrollable, Scrollable, Settings, Text, text_input, TextInput, Rule};
+use iced::{Align, Application, button, Button, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Text, text_input, TextInput};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{ApplicationStateDb, ApplicationStatus, DeviceStatus, ShutdownMessage};
 use crate::configuration::{Configuration, Motor};
 use crate::executor::TokioExecutor;
+
 use super::theme::Theme;
 
 const TEXT_INPUT_PADDING: u16 = 5;
@@ -184,7 +185,6 @@ impl Application for Gui {
             Gui::Loading => {
                 Container::new(
                     Text::new("Loading…")
-                        .horizontal_alignment(HorizontalAlignment::Center)
                         .size(TEXT_SIZE_MASSIVE)
                 )
                     .style(STYLE)
@@ -203,9 +203,6 @@ impl Application for Gui {
                     .push(Column::new()
                         .spacing(TABLE_SPACING)
                         .width(Length::Fill)
-                        .push(
-                            Text::new("Welcome, dear user, to my incredibly ugly GUI. My condolences for your eyes. A more polished version is coming Soon™")
-                        )
                         .push(Row::new()
                             .spacing(TABLE_SPACING)
                             .push(
@@ -221,7 +218,8 @@ impl Application for Gui {
                         )
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
-                            .push(Text::new("Server port:"))
+                            .align_items(Align::Center)
+                            .push(input_label("Server port:3031"))
                             .push(
                                 TextInput::new(&mut state.port_input, "server port", state.port_text.as_str(), Message::PortUpdated)
                                     .style(STYLE)
@@ -359,7 +357,8 @@ impl TaggedMotor {
     fn view(&mut self) -> Element<MotorMessage> {
         let row = Row::new()
             .spacing(EOL_INPUT_SPACING)
-            .push(Text::new(format!("{}", &self.motor)));
+            .align_items(Align::Center)
+            .push(input_label(format!("{}", &self.motor)));
 
         let row = match &mut self.state {
             TaggedMotorState::Tagged { tag, delete_tag_button } => {
@@ -414,7 +413,7 @@ fn render_device_list(devices: &Vec<DeviceStatus>) -> Element<Message> {
     } else {
         devices.iter()
             .fold(col, |column, device| {
-                column.push(Text::new(format!("{}", device)))
+                column.push(input_label(format!("{}", device)))
             })
     };
     col.into()
@@ -441,4 +440,13 @@ fn build_example_message(motors: &Vec<TaggedMotor>) -> String {
         .map(|tag| format!("{}:0.5", tag))
         .collect::<Vec<_>>()
         .join(";")
+}
+
+fn input_label<'a, S: Into<String>, T: 'a>(label: S) -> Element<'a, T> {
+    let text = Text::new(label);
+
+    Container::new(text)
+        .padding(TEXT_INPUT_PADDING)
+        .style(STYLE)
+        .into()
 }
