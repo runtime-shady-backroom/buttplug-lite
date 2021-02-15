@@ -5,7 +5,7 @@ This application serves a websocket that runs a dramatically simplified version 
 - Extremely simple fire-and-forget protocol
 - Standalone application requiring no other software
 
-![screenshot of GUI](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/intiface-proxy/images/buttplug-lite-0.4.0.png)
+![screenshot of GUI](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/intiface-proxy/images/buttplug-lite-0.4.1.png)
 
 
 ## Supported Devices
