@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{Align, Application, button, Button, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Text, text_input, TextInput};
+use iced::{Align, Application, button, Button, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Text, text_input, TextInput, Clipboard, Subscription};
+use iced_native::{window, Event};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{ApplicationStateDb, ApplicationStatus, DeviceStatus, ShutdownMessage};
@@ -38,6 +39,7 @@ pub fn run(
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
         antialiasing: true,
+        exit_on_close_request: false,
     };
 
     Gui::run(settings).expect("could not instantiate window");
@@ -61,6 +63,7 @@ enum Message {
     SaveConfigurationComplete(Result<(), String>),
     PortUpdated(String),
     MotorMessage(usize, MotorMessage),
+    EventOccurred(iced_native::Event),
 }
 
 enum Gui {
@@ -80,6 +83,7 @@ struct State {
     restart_warp_button: button::State,
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
+    should_exit: bool,
 }
 
 impl Gui {
@@ -96,6 +100,7 @@ impl Gui {
             restart_warp_button: Default::default(),
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
+            should_exit: false,
         })
     }
 }
@@ -113,7 +118,7 @@ impl Application for Gui {
         format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).into()
     }
 
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Self::Message, _clipboard: &mut Clipboard) -> Command<Self::Message> {
         match self {
             Gui::Loading => {
                 Command::none()
@@ -138,6 +143,7 @@ impl Application for Gui {
                                 restart_warp_button: old_state.restart_warp_button,
                                 warp_restart_tx: old_state.warp_restart_tx,
                                 application_state_db: old_state.application_state_db,
+                                should_exit: old_state.should_exit,
                             });
                         } else {
                             // this should never happen
@@ -172,6 +178,13 @@ impl Application for Gui {
                         match state.devices.motors.get_mut(i) {
                             Some(motor) => motor.update(motor_message),
                             None => eprintln!("motor index out of bounds"),
+                        }
+                        Command::none()
+                    }
+                    Message::EventOccurred(event) => {
+                        if let Event::Window(window::Event::CloseRequested) = event {
+                            println!("received gui shutdown request"); //TODO: actually run shutdown code
+                            state.should_exit = true;
                         }
                         Command::none()
                     }
@@ -252,6 +265,21 @@ impl Application for Gui {
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .into()
+            }
+        }
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        iced_native::subscription::events().map(Message::EventOccurred)
+    }
+
+    fn should_exit(&self) -> bool {
+        match self {
+            Gui::Loading => {
+                false
+            }
+            Gui::Loaded(state) => {
+                state.should_exit
             }
         }
     }

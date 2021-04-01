@@ -210,7 +210,7 @@ async fn tokio_main() {
     }
 }
 
-fn create_config_file_path<'a>() -> PathBuf {
+fn create_config_file_path() -> PathBuf {
     let config_dir_path = app_dirs::get_app_root(AppDataType::UserConfig, &APP_INFO).expect("unable to locate configuration directory");
     fs::create_dir_all(config_dir_path.as_path()).expect("failed to create configuration directory");
     config_dir_path.join("config.toml")
