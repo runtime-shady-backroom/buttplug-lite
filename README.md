@@ -13,7 +13,14 @@ All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filt
 
 ## Integrations
 ### Neos VR
-A template is available in this public folder: `neosrec:///U-runtime/R-1d65fb20-ab7b-46c1-89eb-90d176309ec2` (paste that link in-game to spawn it)
+A Logix reference implementation is available in this public folder:  
+`neosrec:///U-runtime/R-1d65fb20-ab7b-46c1-89eb-90d176309ec2` (paste that link in-game to spawn it).
+
+Below is a screenshot of the reference implementation.
+
+![screenshot of reference implementation](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/intiface-proxy/images/reference-implementation-1.0.webp)
+
+This implementation is designed to go on an avatar. The `avatar/user` input should contain the user currently in the avatar. This could be sourced from an AvatarUserReferenceAssigner or a [Get Active User](https://wiki.neos.com/Get_Active_User_(LogiX_node)). The top half of the Logix handles resetting the websocket connection when a new user enters the avatar, and can be omitted if the avatar will only ever be used by one user. The lower half of the logix sends updates to the buttplug-lite server at around 7 Hz. If you go too far beyond 7 Hz you may start to run into latency issues. The two float inputs should be between zero and one (inclusive) and represent the desired motor intensity. You could source this from any number of places, such as Nearest User Hand, VirtualHapticPointSampler, or even a simple UI slider.
 
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/intiface-proxy/releases/latest).
