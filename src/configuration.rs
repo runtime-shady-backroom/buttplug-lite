@@ -6,8 +6,6 @@ use std::fmt;
 use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
 use serde::{Deserialize, Serialize};
 
-use crate::configuration::MotorType::Vibration;
-
 const DEFAULT_PORT: u16 = 3031;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -61,7 +59,7 @@ pub enum MotorType {
 impl MotorType {
     pub fn get_type(&self) -> ButtplugCurrentSpecDeviceMessageType {
         match self {
-            Vibration => ButtplugCurrentSpecDeviceMessageType::VibrateCmd,
+            MotorType::Vibration => ButtplugCurrentSpecDeviceMessageType::VibrateCmd,
             MotorType::Linear => ButtplugCurrentSpecDeviceMessageType::LinearCmd,
             MotorType::Rotation => ButtplugCurrentSpecDeviceMessageType::RotateCmd,
         }
@@ -77,7 +75,7 @@ impl Display for MotorType {
         match self {
             MotorType::Linear => write!(f, "linear"),
             MotorType::Rotation => write!(f, "rotation"),
-            Vibration => write!(f, "vibration"),
+            MotorType::Vibration => write!(f, "vibration"),
         }
     }
 }

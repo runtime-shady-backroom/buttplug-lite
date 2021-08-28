@@ -9,7 +9,7 @@ This application serves a websocket that runs a dramatically simplified version 
 
 
 ## Supported Devices
-All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work. Currently only vibration is supported. Rotatation and linear drives will come soon, and will require additions to the protocol.
+All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work.
 
 ## Integrations
 ### Neos VR
@@ -33,22 +33,40 @@ This implementation is designed to go on an avatar. The `avatar/user` input shou
 Send text-type messages to `ws://127.0.0.1:3031/haptic`. Binary-type messages are not currently supported. Commands should be sent at most at a 10hz rate. Beyond that application performance may begin to degrade.
 
 #### Message Format
-The message format is a list of semicolon (`;`) delimited motor commands. Each motor command is a tag followed by a colon (`:`) followed by a floating-point number representing desired motor strength. Motor strength floats should be in the range [0, 1], and are represented internally using 64 bits.
+The message format is a list of semicolon (`;`) delimited motor commands. There are three possible types of command: Vibration, Linear, and Rotation. All commands start with a motor tag, which is a user-defined string representing a specific motor on a specific device.
 
-##### An Example Command
+##### Vibration
+`tag:strength`  
+Strength controls vibration intensity and ranges from `0.0` to `1.0`.
 
-| Tag | Strength
-| --- | ---
-| foo | 0.00
-| bar | 0.30
-| baz | 0.99
+##### Linear
+`tag:duration:position`  
+Position control target position and ranges from `0.0` to `1.0`.  
+Duration controls time in milliseconds the device should take to move to the target position. Duration must be a positive integer.
+
+##### Rotation
+`tag:speed`  
+Speed controls the speed of rotation and ranges from `-1.0` to `1.0`. Positive numbers are clockwise, negative numbers are counterclockwise.
+
+#### An Example Command
+
+| Tag    | Type      | Strength | Duration | Position | Speed |
+| ------ | --------- | -------- | -------- | -------- | ----- |
+| foo    | Vibration | 0%       |          |          |       |
+| bar    | Vibration | 30%      |          |          |       |
+| baz    | Vibration | 100%     |          |          |       |
+| gort   | Linear    |          | 20ms     | 25%      |       |
+| klaatu | Linear    |          | 400ms    | 75%      |       |
+| barada | Rotation  |          |          |          | -0.75 |
+| nikto  | Rotation  |          |          |          |  0.26 |
+
 
 ```
-foo:0;bar:0.3;baz:0.99
+foo:0;bar:0.3;baz:1;gort:20:0.25;klaatu:400:0.75;barada:-0.75:t;nikto:0.26:f
 ```
 
 #### Motor State
-Motors will continue running at the strength last commanded until another update is received.
+Motors will continue running at the vibration and rotation speeds last commanded until another update is received.
 
 If no command is received for 10 seconds, buttplug-lite will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
 

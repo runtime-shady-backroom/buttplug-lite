@@ -1,10 +1,8 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{convert, fmt, fs};
-use std::cmp::Ordering;
+use std::{convert, fs};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::ops::DerefMut;
 use std::path::PathBuf;
@@ -13,7 +11,14 @@ use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
 use app_dirs::{AppDataType, AppInfo};
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, device::VibrateCommand};
+use buttplug::client::{
+    ButtplugClient,
+    ButtplugClientDevice,
+    ButtplugClientEvent,
+    device::LinearCommand,
+    device::RotateCommand,
+    device::VibrateCommand,
+};
 use buttplug::connector::ButtplugInProcessClientConnector;
 use buttplug::server::comm_managers::{
     btleplug::BtlePlugCommunicationManager,
@@ -30,13 +35,17 @@ use warp::Filter;
 use configuration::Configuration;
 
 use crate::configuration::{Motor, MotorType};
+use crate::device_status::DeviceStatus;
 use crate::gui::window::TaggedMotor;
+use crate::motor_settings::MotorSettings;
 use crate::watchdog::WatchdogTimeoutDb;
 
 mod configuration;
 mod watchdog;
 mod gui;
 mod executor;
+mod motor_settings;
+mod device_status;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
@@ -391,40 +400,6 @@ struct DeviceList {
     devices: Vec<DeviceStatus>,
 }
 
-/// status of a single device
-#[derive(Clone, Debug)]
-pub struct DeviceStatus {
-    pub name: String,
-    pub battery_level: Option<f64>,
-    pub rssi_level: Option<i32>,
-}
-
-impl Display for DeviceStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} battery={:?} rssi={:?}", self.name, self.battery_level, self.rssi_level)
-    }
-}
-
-impl Eq for DeviceStatus {}
-
-impl PartialEq for DeviceStatus {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
-impl Ord for DeviceStatus {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.name.cmp(&other.name)
-    }
-}
-
-impl PartialOrd for DeviceStatus {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let devices = application_state.client.devices();
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
@@ -542,10 +517,26 @@ async fn haptic_handler(
 
                 for device in application_state.client.devices() {
                     match device_map.remove(device.name.as_str()) {
-                        Some(speed_map) => {
-                            match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
-                                Ok(()) => (),
-                                Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                        Some(motor_settings) => {
+                            let MotorSettings { speed_map, rotate_map, linear_map } = motor_settings;
+
+                            if !speed_map.is_empty() {
+                                match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
+                                    Ok(()) => (),
+                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                                }
+                            }
+                            if !rotate_map.is_empty() {
+                                match device.rotate(RotateCommand::RotateMap(rotate_map)).await {
+                                    Ok(()) => (),
+                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                                }
+                            }
+                            if !linear_map.is_empty() {
+                                match device.linear(LinearCommand::LinearMap(linear_map)).await {
+                                    Ok(()) => (),
+                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                                }
                             }
                         }
                         None => () // ignore this device
@@ -574,8 +565,8 @@ async fn haptic_handler(
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<HashMap<String, HashMap<u32, f64>>, String> {
-    let mut devices: HashMap<String, HashMap<u32, f64>> = HashMap::new();
+fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
+    let mut devices: HashMap<String, MotorSettings> = HashMap::new();
 
     for line in command.split(';') {
         let mut split_line = line.split(':');
@@ -583,23 +574,68 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
             Some(tag) => tag,
             None => return Err(format!("could not extract motor tag from {}", line))
         };
-        let intensity = match split_line.next() {
-            Some(tag) => tag,
-            None => return Err(format!("could not extract motor intensity from {}", line))
-        };
-        let intensity = match intensity.parse::<f64>() {
-            Ok(f) => f.clamp(0.0, 1.0),
-            Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
-        };
         match configuration.motor_from_tag(&tag.to_string()) {
             Some(motor) => {
-                if let MotorType::Vibration = motor.feature_type {
-                    // make a new submap if needed
-                    devices.entry(motor.device_name.clone())
-                        .or_insert(HashMap::new())
-                        .insert(motor.feature_index, intensity);
-                } else {
-                    eprintln!("{}: ignoring tag {} because only vibration is supported presently", LOG_PREFIX_HAPTIC_ENDPOINT, tag)
+                match motor.feature_type {
+                    MotorType::Vibration => {
+                        let intensity = match split_line.next() {
+                            Some(tag) => tag,
+                            None => return Err(format!("could not extract motor intensity from {}", line))
+                        };
+                        let intensity = match intensity.parse::<f64>() {
+                            Ok(f) => f.clamp(0.0, 1.0),
+                            Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
+                        };
+
+                        devices.entry(motor.device_name.clone())
+                            .or_insert(MotorSettings::default())
+                            .speed_map
+                            .insert(motor.feature_index, intensity);
+                    }
+                    MotorType::Linear => {
+                        let duration = match split_line.next() {
+                            Some(tag) => tag,
+                            None => return Err(format!("could not extract motor duration from {}", line))
+                        };
+                        let duration = match duration.parse::<u32>() {
+                            Ok(u) => u,
+                            Err(e) => return Err(format!("could not parse motor duration from {}: {:?}", duration, e))
+                        };
+
+                        let position = match split_line.next() {
+                            Some(tag) => tag,
+                            None => return Err(format!("could not extract motor position from {}", line))
+                        };
+                        let position = match position.parse::<f64>() {
+                            Ok(f) => f.clamp(0.0, 1.0),
+                            Err(e) => return Err(format!("could not parse motor position from {}: {:?}", position, e))
+                        };
+
+                        devices.entry(motor.device_name.clone())
+                            .or_insert(MotorSettings::default())
+                            .linear_map
+                            .insert(motor.feature_index, (duration, position));
+                    }
+                    MotorType::Rotation => {
+                        let speed = match split_line.next() {
+                            Some(tag) => tag,
+                            None => return Err(format!("could not extract motor speed from {}", line))
+                        };
+                        let mut speed = match speed.parse::<f64>() {
+                            Ok(f) => f.clamp(-1.0, 1.0),
+                            Err(e) => return Err(format!("could not parse motor speed from {}: {:?}", speed, e))
+                        };
+
+                        let direction = speed >= 0.0;
+                        if !direction {
+                            speed = -speed;
+                        }
+
+                        devices.entry(motor.device_name.clone())
+                            .or_insert(MotorSettings::default())
+                            .rotate_map
+                            .insert(motor.feature_index, (speed, direction));
+                    }
                 }
             }
             None => eprintln!("{}: ignoring unknown motor tag {}", LOG_PREFIX_HAPTIC_ENDPOINT, tag)

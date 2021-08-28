@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{Align, Application, button, Button, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Text, text_input, TextInput, Clipboard, Subscription};
-use iced_native::{window, Event};
+use iced::{Align, Application, button, Button, Clipboard, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Subscription, Text, text_input, TextInput};
+use iced_native::{Event, window};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{ApplicationStateDb, ApplicationStatus, DeviceStatus, ShutdownMessage};
-use crate::configuration::{Configuration, Motor};
+use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage};
+use crate::configuration::{Configuration, Motor, MotorType};
+use crate::device_status::DeviceStatus;
 use crate::executor::TokioExecutor;
 
 use super::theme::Theme;
@@ -232,7 +233,7 @@ impl Application for Gui {
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
                             .align_items(Align::Center)
-                            .push(input_label("Server port:3031"))
+                            .push(input_label("Server port:"))
                             .push(
                                 TextInput::new(&mut state.port_input, "server port", state.port_text.as_str(), Message::PortUpdated)
                                     .style(STYLE)
@@ -419,7 +420,7 @@ impl TaggedMotor {
 fn render_motor_list(motors: &mut Vec<TaggedMotor>) -> Element<Message> {
     let col = Column::new()
         .spacing(TABLE_SPACING)
-        .push(Text::new("Motors").size(TEXT_SIZE_BIG));
+        .push(Text::new("Motor Configuration").size(TEXT_SIZE_BIG));
     let col = if motors.is_empty() {
         col.push(Text::new("No motors"))
     } else {
@@ -435,7 +436,7 @@ fn render_motor_list(motors: &mut Vec<TaggedMotor>) -> Element<Message> {
 fn render_device_list(devices: &Vec<DeviceStatus>) -> Element<Message> {
     let col = Column::new()
         .spacing(TABLE_SPACING)
-        .push(Text::new("Devices").size(TEXT_SIZE_BIG));
+        .push(Text::new("Connected Devices").size(TEXT_SIZE_BIG));
     let col = if devices.is_empty() {
         col.push(Text::new("No devices"))
     } else {
@@ -464,8 +465,19 @@ fn tags_from_application_status(application_status: &ApplicationStatus) -> HashM
 
 fn build_example_message(motors: &Vec<TaggedMotor>) -> String {
     motors.iter()
-        .flat_map(|motor| motor.tag())
-        .map(|tag| format!("{}:0.5", tag))
+        .flat_map(|motor| {
+            if let Some(tag) = motor.tag() {
+                Some(
+                    match motor.motor.feature_type {
+                        MotorType::Linear => format!("{}:20:0.5", tag),
+                        MotorType::Rotation => format!("{}:-0.5", tag),
+                        MotorType::Vibration => format!("{}:0.5", tag),
+                    }
+                )
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>()
         .join(";")
 }
