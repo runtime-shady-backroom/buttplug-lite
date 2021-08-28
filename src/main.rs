@@ -20,6 +20,7 @@ use buttplug::client::{
     device::VibrateCommand,
 };
 use buttplug::connector::ButtplugInProcessClientConnector;
+use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
 use buttplug::server::comm_managers::{
     btleplug::BtlePlugCommunicationManager,
     lovense_dongle::{LovenseHIDDongleCommunicationManager, LovenseSerialDongleCommunicationManager},
@@ -405,9 +406,15 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
 
     for device in devices.iter() {
+        let battery_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::BatteryLevelCmd) {
+            Some(_battery_message_attributes) => device.battery_level().await.ok(),
+            None => None
+        };
+        let rssi_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::RSSILevelCmd) {
+            Some(_rssi_message_attributes) => device.rssi_level().await.ok(),
+            None => None
+        };
         let name = device.name.clone();
-        let battery_level = device.battery_level().await.ok();
-        let rssi_level = device.rssi_level().await.ok();
         device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
     }
 
