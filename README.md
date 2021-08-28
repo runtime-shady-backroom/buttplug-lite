@@ -41,7 +41,7 @@ Strength controls vibration intensity and ranges from `0.0` to `1.0`.
 
 ##### Linear
 `tag:duration:position`  
-Position control target position and ranges from `0.0` to `1.0`.  
+Position controls target position and ranges from `0.0` to `1.0`.  
 Duration controls time in milliseconds the device should take to move to the target position. Duration must be a positive integer.
 
 ##### Rotation
