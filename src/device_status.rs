@@ -12,7 +12,28 @@ pub struct DeviceStatus {
 
 impl Display for DeviceStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} battery={:?} rssi={:?}", self.name, self.battery_level, self.rssi_level)
+        let battery = if let Some(battery) = self.battery_level {
+            format!("battery={:.0}%", battery * 100.0)
+        } else {
+            String::new()
+        };
+        let rssi = if let Some(rssi) = self.rssi_level {
+            format!("rssi={}", rssi)
+        } else {
+            String::new()
+        };
+        if battery.is_empty() && rssi.is_empty() {
+            write!(f, "{}", self.name)
+        } else if rssi.is_empty() {
+            // yes battery, no rssi
+            write!(f, "{} ({})", self.name, battery)
+        } else if battery.is_empty() {
+            // yes rssi, no battery
+            write!(f, "{} ({})", self.name, rssi)
+        } else {
+            // yes battery, yes rssi
+            write!(f, "{} ({}, {})", self.name, battery, rssi)
+        }
     }
 }
 

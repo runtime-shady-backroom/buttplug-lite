@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_PORT: u16 = 3031;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Configuration {
     pub port: u16,
     pub tags: HashMap<String, Motor>,

@@ -199,7 +199,7 @@ async fn tokio_main() {
 
     if let Ok(()) = gui_start_rx.await {
         //TODO: wait for buttplug to notice devices
-        let initial_devices = get_tagged_devices(&application_state_db).await;
+        let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
         gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices); // blocking call
 
@@ -313,14 +313,17 @@ fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=std::conv
     warp::any().map(move || db.clone())
 }
 
-pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: Configuration, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<(), String> {
+pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: Configuration, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<Configuration, String> {
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
     let previous_state = std::mem::replace(lock.deref_mut(), None);
     let result = match previous_state {
         Some(ApplicationState { client, configuration: previous_configuration }) => {
             let new_port = configuration.port;
-            *lock = Some(ApplicationState { client, configuration });
+            *lock = Some(ApplicationState {
+                client,
+                configuration: configuration.clone(),
+            });
             drop(lock);
 
             // restart warp if necessary
@@ -329,7 +332,7 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
                     .map_err(|e| format!("{:?}", e))?;
             }
 
-            Ok(())
+            Ok(configuration)
         }
         None => Err("cannot update configuration until after initial haptic server startup".into())
     };
@@ -348,14 +351,14 @@ async fn save_configuration(configuration: &Configuration) -> Result<(), String>
 }
 
 /// full list of all device information we could ever want
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ApplicationStatus {
     pub motors: Vec<TaggedMotor>,
     pub devices: Vec<DeviceStatus>,
-    pub port: u16,
+    pub configuration: Configuration,
 }
 
-pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> ApplicationStatus {
+pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Option<ApplicationStatus> {
     let application_state_mutex = application_state_db.read().await;
     match application_state_mutex.as_ref() {
         Some(application_state) => {
@@ -379,13 +382,13 @@ pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Ap
             tagged_motors.sort_unstable();
             devices.sort_unstable();
 
-            ApplicationStatus {
+            Some(ApplicationStatus {
                 motors: tagged_motors,
                 devices,
-                port: configuration.port,
-            }
+                configuration: configuration.clone(),
+            })
         }
-        None => Default::default()
+        None => None
     }
 }
 
