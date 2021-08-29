@@ -578,7 +578,7 @@ async fn haptic_handler(
 fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
     let mut devices: HashMap<String, MotorSettings> = HashMap::new();
 
-    for line in command.split(';') {
+    for line in command.split_terminator(';') {
         let mut split_line = line.split(':');
         let tag = match split_line.next() {
             Some(tag) => tag,
