@@ -27,11 +27,15 @@ use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServ
 use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
 use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
 use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
+use clap::{App, Arg};
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
+use tracing::Level;
+use tracing_subscriber;
+use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
 
 use configuration::Configuration;
@@ -90,6 +94,29 @@ fn main() {
 
 async fn tokio_main() {
     println!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author("runtime")
+        .about("Makes vibrators go brr")
+        .arg(Arg::with_name("v")
+            .short("v")
+            .multiple(true)
+            .help("Sets the level of verbosity"))
+        .get_matches();
+
+    let verbosity = matches.occurrences_of("v");
+    if verbosity > 0 {
+        let level = if verbosity > 1 {
+            Level::DEBUG
+        } else {
+            Level::INFO
+        };
+        tracing_subscriber::fmt()
+            .with_max_level(level)
+            .finish()
+            .init();
+    }
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));

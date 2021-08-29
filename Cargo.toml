@@ -1,6 +1,6 @@
 [package]
 name = "buttplug-lite"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 edition = "2018"
 
@@ -17,3 +17,6 @@ app_dirs = "^1.2.1"
 iced = "^0.3.0"
 iced_native = "^0.4.0"
 lazy_static = "^1.4.0"
+tracing = "^0.1.0"
+tracing-subscriber = "^0.2.0"
+clap = "^2.33.0"
