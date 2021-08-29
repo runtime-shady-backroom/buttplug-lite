@@ -21,11 +21,12 @@ use buttplug::client::{
 };
 use buttplug::connector::ButtplugInProcessClientConnector;
 use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
-use buttplug::server::comm_managers::{
-    btleplug::BtlePlugCommunicationManager,
-    lovense_dongle::{LovenseHIDDongleCommunicationManager, LovenseSerialDongleCommunicationManager},
-    xinput::XInputDeviceCommunicationManager,
-};
+use buttplug::server::ButtplugServerBuilder;
+use buttplug::server::comm_managers::btleplug::BtlePlugCommunicationManagerBuilder;
+use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
+use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
+use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
+use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
@@ -239,16 +240,20 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
-    let connector = ButtplugInProcessClientConnector::default();
 
-    let server = connector.server_ref();
-    server.add_comm_manager::<BtlePlugCommunicationManager>().unwrap();
-    server.add_comm_manager::<LovenseHIDDongleCommunicationManager>().unwrap();
-    server.add_comm_manager::<LovenseSerialDongleCommunicationManager>().unwrap();
+    let server = ButtplugServerBuilder::default().finish().expect("Failed to initialize buttplug server");
+    let device_manager = server.device_manager();
+
+    device_manager.add_comm_manager(BtlePlugCommunicationManagerBuilder::default()).expect("failed to initialize BtlePlug");
+    device_manager.add_comm_manager(SerialPortCommunicationManagerBuilder::default()).expect("failed to initialize serial port");
+    device_manager.add_comm_manager(LovenseHIDDongleCommunicationManagerBuilder::default()).expect("failed to initialize Lovense HID dongle");
+    device_manager.add_comm_manager(LovenseSerialDongleCommunicationManagerBuilder::default()).expect("failed to initialize Lovense serial dongle");
+    device_manager.add_comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default()).expect("failed to initialize Lovense connect");
 
     #[cfg(target_os = "windows")] {
-        server.add_comm_manager::<XInputDeviceCommunicationManager>().unwrap();
+        device_manager.add_comm_manager(XInputDeviceCommunicationManagerBuilder::default()).unwrap();
     }
+    let connector = ButtplugInProcessClientConnector::new(Some(server));
 
     match buttplug_client.connect(connector).await {
         Ok(()) => {
