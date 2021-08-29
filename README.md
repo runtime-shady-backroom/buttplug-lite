@@ -9,7 +9,7 @@ This application serves a websocket that runs a dramatically simplified version 
 
 
 ## Supported Devices
-All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work.
+All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work. This includes everything from Lovense devices to Xbox controllers.
 
 ## Integrations
 ### Neos VR
@@ -48,21 +48,31 @@ Duration controls time in milliseconds the device should take to move to the tar
 `tag:speed`  
 Speed controls the speed of rotation and ranges from `-1.0` to `1.0`. Positive numbers are clockwise, negative numbers are counterclockwise.
 
+##### Contraction
+`tag:level`
+Contraction controls the pump strength on the Lovense Max. It must be an integer between `0` and `3`, inclusive. **Contraction is an unstable feature and may be changed in future versions!**
+
 #### An Example Command
 
-| Tag    | Type      | Strength | Duration | Position | Speed |
-| ------ | --------- | -------- | -------- | -------- | ----- |
-| foo    | Vibration | 0%       |          |          |       |
-| bar    | Vibration | 30%      |          |          |       |
-| baz    | Vibration | 100%     |          |          |       |
-| gort   | Linear    |          | 20ms     | 25%      |       |
-| klaatu | Linear    |          | 400ms    | 75%      |       |
-| barada | Rotation  |          |          |          | -0.75 |
-| nikto  | Rotation  |          |          |          |  0.26 |
+| Tag    | Type         | Strength | Duration | Position | Speed | Contraction |
+| ------ | ------------ | -------: | -------: | -------: | ----: | ----------: |
+| foo    | Vibration    | 0%       |          |          |       |             |
+| bar    | Vibration    | 30%      |          |          |       |             |
+| baz    | Vibration    | 100%     |          |          |       |             |
+| gort   | Linear       |          | 20ms     | 25%      |       |             |
+| klaatu | Linear       |          | 400ms    | 75%      |       |             |
+| barada | Rotation     |          |          |          | -0.75 |             |
+| nikto  | Rotation     |          |          |          |  0.26 |             |
+| max    | Contraction  |          |          |          |       | 3           |
 
 
 ```
-foo:0;bar:0.3;baz:1;gort:20:0.25;klaatu:400:0.75;barada:-0.75;nikto:0.26
+foo:0;bar:0.3;baz:1;gort:20:0.25;klaatu:400:0.75;barada:-0.75;nikto:0.26;max:3
+```
+
+Note that you are not required to specify all the tagged motors if you don't want to. The following is also valid, but will of course only drive the `foo` motor.
+```
+foo:0.1
 ```
 
 #### Motor State

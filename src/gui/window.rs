@@ -529,6 +529,7 @@ fn build_example_message(motors: &Vec<TaggedMotor>) -> String {
                         MotorType::Linear => format!("{}:20:0.5", tag),
                         MotorType::Rotation => format!("{}:-0.5", tag),
                         MotorType::Vibration => format!("{}:0.5", tag),
+                        MotorType::Contraction => format!("{}:3", tag),
                     }
                 )
             } else {

@@ -21,6 +21,7 @@ use buttplug::client::{
 };
 use buttplug::connector::ButtplugInProcessClientConnector;
 use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
+use buttplug::device::Endpoint;
 use buttplug::server::ButtplugServerBuilder;
 use buttplug::server::comm_managers::btleplug::BtlePlugCommunicationManagerBuilder;
 use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
@@ -70,6 +71,8 @@ const APP_INFO: AppInfo = AppInfo {
     name: env!("CARGO_PKG_NAME"),
     author: "runtime",
 };
+
+static DEVICE_CONFIGURATION_JSON: &str = include_str!("resources/device_configuration.json");
 
 lazy_static! {
     static ref CONFIG_DIR_FILE_PATH: PathBuf = create_config_file_path();
@@ -268,7 +271,11 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
 
-    let server = ButtplugServerBuilder::default().finish().expect("Failed to initialize buttplug server");
+    let server = ButtplugServerBuilder::default()
+        .name("buttplug-lite")
+        .user_device_configuration_json(Some(DEVICE_CONFIGURATION_JSON.into()))
+        .finish()
+        .expect("Failed to initialize buttplug server");
     let device_manager = server.device_manager();
 
     device_manager.add_comm_manager(BtlePlugCommunicationManagerBuilder::default()).expect("failed to initialize BtlePlug");
@@ -480,10 +487,28 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
 }
 
 fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClientDevice) -> u32 {
-    device.allowed_messages.get(&device_type.get_type())
-        .map(|attributes| attributes.feature_count)
-        .flatten()
-        .unwrap_or(0)
+    match device_type.get_type() {
+        Some(message_type) => {
+            device.allowed_messages.get(&message_type)
+                .map(|attributes| attributes.feature_count)
+                .flatten()
+                .unwrap_or(0)
+        }
+        None => {
+            match device_type {
+                MotorType::Contraction => {
+                    if device.name == "Lovense Max" && device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::RawWriteCmd).is_some() {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                MotorType::Linear => panic!("linear type should have already been handled"),
+                MotorType::Rotation => panic!("rotation type should have already been handled"),
+                MotorType::Vibration => panic!("vibration type should have already been handled"),
+            }
+        }
+    }
 }
 
 // return a device status summary
@@ -560,7 +585,12 @@ async fn haptic_handler(
                 for device in application_state.client.devices() {
                     match device_map.remove(device.name.as_str()) {
                         Some(motor_settings) => {
-                            let MotorSettings { speed_map, rotate_map, linear_map } = motor_settings;
+                            let MotorSettings {
+                                speed_map,
+                                rotate_map,
+                                linear_map,
+                                contraction_hack,
+                            } = motor_settings;
 
                             if !speed_map.is_empty() {
                                 match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
@@ -579,6 +609,10 @@ async fn haptic_handler(
                                     Ok(()) => (),
                                     Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                                 }
+                            }
+                            if let Some(air_level) = contraction_hack {
+                                let command = format!("Air:Level:{};", air_level);
+                                device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
                             }
                         }
                         None => () // ignore this device
@@ -677,6 +711,20 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             .or_insert(MotorSettings::default())
                             .rotate_map
                             .insert(motor.feature_index, (speed, direction));
+                    }
+                    MotorType::Contraction => {
+                        let air_level = match split_line.next() {
+                            Some(tag) => tag,
+                            None => return Err(format!("could not extract motor speed from {}", line))
+                        };
+                        let air_level = match air_level.parse::<u8>() {
+                            Ok(b) => b.clamp(0, 3),
+                            Err(e) => return Err(format!("could not parse motor contraction from {}: {:?}", air_level, e))
+                        };
+
+                        devices.entry(motor.device_name.clone())
+                            .or_insert(MotorSettings::default())
+                            .contraction_hack = Some(air_level);
                     }
                 }
             }

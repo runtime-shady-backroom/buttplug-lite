@@ -43,10 +43,11 @@ impl Display for Motor {
     }
 }
 
-const MOTOR_TYPES: [MotorType; 3] = [
+const MOTOR_TYPES: [MotorType; 4] = [
     MotorType::Vibration,
     MotorType::Linear,
     MotorType::Rotation,
+    MotorType::Contraction,
 ];
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
@@ -54,14 +55,16 @@ pub enum MotorType {
     Linear,
     Rotation,
     Vibration,
+    Contraction,
 }
 
 impl MotorType {
-    pub fn get_type(&self) -> ButtplugCurrentSpecDeviceMessageType {
+    pub fn get_type(&self) -> Option<ButtplugCurrentSpecDeviceMessageType> {
         match self {
-            MotorType::Vibration => ButtplugCurrentSpecDeviceMessageType::VibrateCmd,
-            MotorType::Linear => ButtplugCurrentSpecDeviceMessageType::LinearCmd,
-            MotorType::Rotation => ButtplugCurrentSpecDeviceMessageType::RotateCmd,
+            MotorType::Vibration => Some(ButtplugCurrentSpecDeviceMessageType::VibrateCmd),
+            MotorType::Linear => Some(ButtplugCurrentSpecDeviceMessageType::LinearCmd),
+            MotorType::Rotation => Some(ButtplugCurrentSpecDeviceMessageType::RotateCmd),
+            MotorType::Contraction => None
         }
     }
 
@@ -76,6 +79,7 @@ impl Display for MotorType {
             MotorType::Linear => write!(f, "linear"),
             MotorType::Rotation => write!(f, "rotation"),
             MotorType::Vibration => write!(f, "vibration"),
+            MotorType::Contraction => write!(f, "contraction"),
         }
     }
 }

@@ -1,0 +1,35 @@
+{
+  "version": 54,
+  "protocols": {
+    "lovense": {
+      "configurations": [
+        {
+          "identifier": [
+            "B"
+          ],
+          "name": {
+            "en-us": "Lovense Max"
+          },
+          "messages": {
+            "RawWriteCmd": {}
+          }
+        }
+      ]
+    },
+    "lovense-connect-service": {
+      "configurations": [
+        {
+          "identifier": [
+            "Max"
+          ],
+          "name": {
+            "en-us": "Lovense Max"
+          },
+          "messages": {
+            "RawWriteCmd": {}
+          }
+        }
+      ]
+    }
+  }
+}
