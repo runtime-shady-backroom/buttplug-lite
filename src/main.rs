@@ -61,11 +61,11 @@ pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
 const BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS: u64 = 5000;
 
 // name of this client from the buttplug.io server's perspective
-const BUTTPLUG_CLIENT_NAME: &str = "in-process-client";
+static BUTTPLUG_CLIENT_NAME: &str = "in-process-client";
 
 // log prefixes:
-const LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
-const LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
+static LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
+static LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
 
 const APP_INFO: AppInfo = AppInfo {
     name: env!("CARGO_PKG_NAME"),
