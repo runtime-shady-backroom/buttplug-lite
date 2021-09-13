@@ -129,7 +129,25 @@ async fn tokio_main() {
         .and(warp::get())
         .and(with_db(application_state_db.clone()))
         .and_then(haptic_status_handler);
-
+    
+    // GET /batterystatus => list of batery levels, spaced with newlines
+    let batterystatus = warp::path("batterystatus").and(warp::get()).and(with_db(application_state_db.clone())).and_then(battery_status_handler);
+    async fn battery_status_handler(application_state_db: ApplicationStateDb) -> Result<impl warp::Reply, warp::Rejection> {
+        let application_state_mutex = application_state_db.read().await;
+        match application_state_mutex.as_ref() {
+            Some(application_state) => {
+                let mut string = String::from("");
+                for device in application_state.client.devices() {
+                    let battery_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::BatteryLevelCmd) { Some(_battery_message_attributes) => device.battery_level().await.ok(), None => None};
+                    string = String::from(format!("{}\n", battery_level.unwrap_or(0.0)).as_str());
+                }
+                Ok(string)
+            }
+            None => Ok(String::from(""))
+        }
+    }
+   
+    
     // WEBSOCKET /haptic
     let haptic = warp::path("haptic")
         .and(warp::ws())
@@ -140,6 +158,7 @@ async fn tokio_main() {
         });
 
     let routes = hapticstatus
+        .or(batterystatus)
         .or(haptic);
 
     watchdog::start(watchdog_timeout_db, application_state_db.clone());
