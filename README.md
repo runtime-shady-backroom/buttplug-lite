@@ -83,8 +83,12 @@ If no command is received for 10 seconds, buttplug-lite will send a stop command
 ### Checking the Status
 Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status let me know at [issue #2](https://github.com/runtime-shady-backroom/buttplug-lite/issues/2).
 
-#### Checking battery
-Send an HTTP GET to `http://127.0.0.1:3031/batterystatus`. Will return with body containing a plain text list of battery levels spaced out by newlines.
+#### Checking Battery
+Send an HTTP GET to `http://127.0.0.1:3031/batterystatus`. A 200 OK will be returned with body containing a plain text list of devices and battery levels. Devices are delimited by newlines, battery levels are delimitd by `:`. Example:
+```
+Lovense Edge:1
+Lovense Max:0.45
+```
 
 ## Feedback
 If you have bugs to report or ideas to suggest please let me know by opening an [issue](https://github.com/runtime-shady-backroom/buttplug-lite/issues) or starting a [discussion](https://github.com/runtime-shady-backroom/buttplug-lite/discussions).
