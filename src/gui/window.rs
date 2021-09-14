@@ -93,6 +93,7 @@ struct State {
 
 impl Gui {
     fn new(flags: Flags) -> Self {
+        let config_version = flags.initial_application_status.configuration.version;
         let port = flags.initial_application_status.configuration.port;
         let ApplicationStatus { motors, devices, configuration } = flags.initial_application_status;
 
@@ -109,7 +110,7 @@ impl Gui {
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
             should_exit: false,
-            configuration_dirty: false,
+            configuration_dirty: Configuration::is_version_outdated(config_version),
             saving: false,
             last_configuration: configuration,
         })
@@ -117,13 +118,8 @@ impl Gui {
 
     fn on_configuration_changed(&mut self) {
         if let Gui::Loaded(state) = self {
-
             // what the new configuration would be if we saved now
-            let new_configuration = Configuration {
-                port: state.port,
-                tags: tags_from_application_status(&state.motors),
-            };
-
+            let new_configuration = Configuration::new(state.port, tags_from_application_status(&state.motors));
             state.configuration_dirty = new_configuration != state.last_configuration;
         }
     }
@@ -197,12 +193,7 @@ impl Application for Gui {
                             state.port_text = state.port.to_string();
 
                             // TODO: validate tags
-
-                            let configuration = Configuration {
-                                port: state.port,
-                                tags: tags_from_application_status(&state.motors),
-                            };
-
+                            let configuration = Configuration::new(state.port, tags_from_application_status(&state.motors));
                             Command::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
                         }
                     }

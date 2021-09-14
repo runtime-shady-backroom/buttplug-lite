@@ -29,6 +29,7 @@ use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicat
 use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
 use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
 use clap::{App, Arg};
+use directories::ProjectDirs;
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
@@ -72,6 +73,7 @@ const APP_INFO: AppInfo = AppInfo {
     author: "runtime",
 };
 
+static CONFIG_FILE_NAME: &str = "config.toml";
 static DEVICE_CONFIGURATION_JSON: &str = include_str!("resources/device_configuration.json");
 
 lazy_static! {
@@ -259,9 +261,12 @@ async fn tokio_main() {
 }
 
 fn create_config_file_path() -> PathBuf {
-    let config_dir_path = app_dirs::get_app_root(AppDataType::UserConfig, &APP_INFO).expect("unable to locate configuration directory");
+    let config_dir_path: PathBuf = ProjectDirs::from("io.github", "runtime-shady-backroom", env!("CARGO_PKG_NAME"))
+        .expect("unable to locate configuration directory")
+        .config_dir()
+        .into();
     fs::create_dir_all(config_dir_path.as_path()).expect("failed to create configuration directory");
-    config_dir_path.join("config.toml")
+    config_dir_path.join(CONFIG_FILE_NAME)
 }
 
 fn create_tokio_runtime() -> tokio::runtime::Runtime {
@@ -310,16 +315,46 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
             let configuration = match previous_state {
                 Some(ApplicationState { configuration, client: _ }) => configuration,
                 None => {
+                    println!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
                     let loaded_configuration = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
                         .map_err(|e| format!("{:?}", e))
+                        .or_else(|error| {
+                            // this whole thing can be removed once enough users are migrated to the new config path
+                            println!("{}: New config missing {:?}, checking old config...", LOG_PREFIX_BUTTPLUG_SERVER, error);
+                            app_dirs::get_app_root(AppDataType::UserConfig, &APP_INFO)
+                                .map_err(|e| format!("app_dirs load: {:?}", e))
+                                .and_then(|old_config_path| {
+                                    let old_config_path = old_config_path.join(CONFIG_FILE_NAME);
+                                    println!("{}: Attempting to load old config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, old_config_path);
+                                    fs::read_to_string(old_config_path.as_path())
+                                        .map_err(|e| format!("app_dirs read: {:?}", e))
+                                })
+                        })
                         .and_then(|string| toml::from_str(&string).map_err(|e| format!("{:?}", e)));
-                    match loaded_configuration {
+                    let configuration = match loaded_configuration {
                         Ok(configuration) => configuration,
                         Err(e) => {
                             //TODO: attempt to backup old config file when read fails
                             eprintln!("falling back to default config due to error: {}", e);
                             Configuration::default()
                         }
+                    };
+                    println!("{}: Loaded configuration v{} from disk", LOG_PREFIX_BUTTPLUG_SERVER, configuration.version);
+
+                    if configuration.is_outdated() {
+                        let new_configuration = configuration.new_with_current_version();
+                        match save_configuration(&new_configuration).await {
+                            Ok(_) => {
+                                println!("{}: Migrated configuration to new directory", LOG_PREFIX_BUTTPLUG_SERVER);
+                                new_configuration
+                            }
+                            Err(e) => {
+                                eprintln!("{}: Error migrating configuration to new directory: {}", LOG_PREFIX_BUTTPLUG_SERVER, e);
+                                configuration
+                            }
+                        }
+                    } else {
+                        configuration
                     }
                 }
             };

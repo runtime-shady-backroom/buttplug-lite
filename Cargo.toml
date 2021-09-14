@@ -14,6 +14,7 @@ buttplug = { version = "^5.0.0", default-features = false, features = ["tokio-ru
 serde = "^1.0.0"
 toml = "^0.5.0"
 app_dirs = "^1.2.1"
+directories = "^3.0.2"
 iced = "^0.3.0"
 iced_native = "^0.4.0"
 lazy_static = "^1.4.0"
