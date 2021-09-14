@@ -685,7 +685,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             None => return Err(format!("could not extract motor intensity from {}", line))
                         };
                         let intensity = match intensity.parse::<f64>() {
-                            Ok(f) => f.clamp(0.0, 1.0),
+                            Ok(f) => f.filter_nan().clamp(0.0, 1.0),
                             Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
                         };
 
@@ -709,7 +709,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             None => return Err(format!("could not extract motor position from {}", line))
                         };
                         let position = match position.parse::<f64>() {
-                            Ok(f) => f.clamp(0.0, 1.0),
+                            Ok(f) => f.filter_nan().clamp(0.0, 1.0),
                             Err(e) => return Err(format!("could not parse motor position from {}: {:?}", position, e))
                         };
 
@@ -724,7 +724,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             None => return Err(format!("could not extract motor speed from {}", line))
                         };
                         let mut speed = match speed.parse::<f64>() {
-                            Ok(f) => f.clamp(-1.0, 1.0),
+                            Ok(f) => f.filter_nan().clamp(-1.0, 1.0),
                             Err(e) => return Err(format!("could not parse motor speed from {}: {:?}", speed, e))
                         };
 
@@ -760,4 +760,18 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
 
     // Ok(&mut devices)
     Ok(devices)
+}
+
+trait FloatExtensions {
+    fn filter_nan(self) -> Self;
+}
+
+impl FloatExtensions for f64 {
+    fn filter_nan(self) -> f64 {
+        if self.is_nan() {
+            0.0
+        } else {
+            self
+        }
+    }
 }
