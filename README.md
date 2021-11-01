@@ -80,6 +80,28 @@ Motors will continue running at the vibration and rotation speeds last commanded
 
 If no command is received for 10 seconds, buttplug-lite will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
 
+### Checking the Application Version
+Send an HTTP GET to `http://127.0.0.1:3031/deviceconfig`. A 200 OK will be returned with body containing the application name and version. Example response:
+```
+buttplug-lite 0.7.0
+```
+Prior to version 0.7.0 this endpoint is a 404.
+
+### Checking the Configuration
+Send an HTTP GET to `http://127.0.0.1:3031/deviceconfig`. A 200 OK will be returned with body containing a machine-readable list of configured motors. Example response:
+```
+o;Lovense Edge;vibration
+c;Lovense Max;contraction
+i;Lovense Edge;vibration
+m;Lovense Max;vibration
+```
+
+The response is a newline (LF) delimited list of motor configurations. There is a trailing newline. Each motor configuration line is a semicolon (`;`) delimited list of tag, device name, and device type. In the case where there are no configured motors the response body will be an empty string.
+
+Possible device types are: `linear`, `rotation`, `vibration`, and `contraction`.
+
+Prior to version 0.7.0 this endpoint is a 404.
+
 ### Checking the Status
 Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status let me know at [issue #2](https://github.com/runtime-shady-backroom/buttplug-lite/issues/2).
 
