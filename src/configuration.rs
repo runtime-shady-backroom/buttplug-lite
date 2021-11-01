@@ -18,6 +18,7 @@ pub struct Configuration {
     #[serde(default = "default_version")]
     pub version: i32,
     pub port: u16,
+    /// map of tag name to motor struct
     pub tags: HashMap<String, Motor>,
 }
 

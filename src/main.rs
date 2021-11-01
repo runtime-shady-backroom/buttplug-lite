@@ -126,6 +126,11 @@ async fn tokio_main() {
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
 
+    // GET / => 200 OK with body application name and version
+    let info = warp::path::end()
+        .and(warp::get())
+        .map(|| format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")));
+
     // GET /hapticstatus => 200 OK with body containing haptic status
     let hapticstatus = warp::path("hapticstatus")
         .and(warp::get())
@@ -138,6 +143,12 @@ async fn tokio_main() {
         .and(with_db(application_state_db.clone()))
         .and_then(battery_status_handler);
 
+    // GET /batterystatus => list of batery levels, spaced with newlines
+    let deviceconfig = warp::path("deviceconfig")
+        .and(warp::get())
+        .and(with_db(application_state_db.clone()))
+        .and_then(device_config_handler);
+
     // WEBSOCKET /haptic
     let haptic = warp::path("haptic")
         .and(warp::ws())
@@ -147,8 +158,10 @@ async fn tokio_main() {
             ws.on_upgrade(|ws| haptic_handler(ws, application_state_db, haptic_watchdog_db))
         });
 
-    let routes = hapticstatus
+    let routes = info
+        .or(hapticstatus)
         .or(batterystatus)
+        .or(deviceconfig)
         .or(haptic);
 
     watchdog::start(watchdog_timeout_db, application_state_db.clone());
@@ -584,6 +597,21 @@ async fn battery_status_handler(application_state_db: ApplicationStateDb) -> Res
                     None => None
                 };
                 string.push_str(format!("{}:{}\n", device.name, battery_level.unwrap_or(-1.0)).as_str());
+            }
+            Ok(string)
+        }
+        None => Ok(String::new())
+    }
+}
+
+// return device config
+async fn device_config_handler(application_state_db: ApplicationStateDb) -> Result<impl warp::Reply, warp::Rejection> {
+    let application_state_mutex = application_state_db.read().await;
+    match application_state_mutex.as_ref() {
+        Some(application_state) => {
+            let mut string = String::new();
+            for (tag, motor) in application_state.configuration.tags.iter() {
+                string.push_str(format!("{};{};{}\n", tag, motor.device_name, motor.feature_type).as_str());
             }
             Ok(string)
         }
