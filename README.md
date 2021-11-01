@@ -81,7 +81,7 @@ Motors will continue running at the vibration and rotation speeds last commanded
 If no command is received for 10 seconds, buttplug-lite will send a stop command to all connected devices. To avoid this, send commands periodically even if your desired motor state has not changed.
 
 ### Checking the Application Version
-Send an HTTP GET to `http://127.0.0.1:3031/deviceconfig`. A 200 OK will be returned with body containing the application name and version. Example response:
+Send an HTTP GET to `http://127.0.0.1:3031/`. A 200 OK will be returned with body containing the application name and version. Example response:
 ```
 buttplug-lite 0.7.0
 ```
