@@ -1,8 +1,8 @@
 [package]
 name = "buttplug-lite"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,11 +13,11 @@ futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "^5.0.0", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1.1.0
 serde = "^1.0.0"
 toml = "^0.5.0"
-app_dirs = "^1.2.1"
-directories = "^4.0.1"
+app_dirs = "^1.2.1" # Purposely kept at old version because 2.0 is an empty library. This will be removed eventually.
+directories = "^4.0.1" # replacement for app_dirs
 iced = "^0.3.0"
 iced_native = "^0.4.0"
 lazy_static = "^1.4.0"
 tracing = "^0.1.0"
-tracing-subscriber = "^0.2.0"
-clap = "^2.33.0"
+tracing-subscriber = "^0.3.0"
+clap = "^2.33.0" #TODO: once we stop getting dependency conflicts update to `clap = { version = "^3.0.10", features = ["derive"] }`
