@@ -54,16 +54,16 @@ Contraction controls the pump strength on the Lovense Max. It must be an integer
 
 #### An Example Command
 
-| Tag    | Type         | Strength | Duration | Position | Speed | Contraction |
-| ------ | ------------ | -------: | -------: | -------: | ----: | ----------: |
-| foo    | Vibration    | 0%       |          |          |       |             |
-| bar    | Vibration    | 30%      |          |          |       |             |
-| baz    | Vibration    | 100%     |          |          |       |             |
-| gort   | Linear       |          | 20ms     | 25%      |       |             |
-| klaatu | Linear       |          | 400ms    | 75%      |       |             |
-| barada | Rotation     |          |          |          | -0.75 |             |
-| nikto  | Rotation     |          |          |          |  0.26 |             |
-| max    | Contraction  |          |          |          |       | 3           |
+| Tag    | Type        | Strength | Duration | Position | Speed | Contraction |
+|--------|-------------|---------:|---------:|---------:|------:|------------:|
+| foo    | Vibration   |       0% |          |          |       |             |
+| bar    | Vibration   |      30% |          |          |       |             |
+| baz    | Vibration   |     100% |          |          |       |             |
+| gort   | Linear      |          |     20ms |      25% |       |             |
+| klaatu | Linear      |          |    400ms |      75% |       |             |
+| barada | Rotation    |          |          |          | -0.75 |             |
+| nikto  | Rotation    |          |          |          |  0.26 |             |
+| max    | Contraction |          |          |          |       |           3 |
 
 
 ```
@@ -106,7 +106,7 @@ Prior to version 0.7.0 this endpoint is a 404.
 Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status let me know at [issue #2](https://github.com/runtime-shady-backroom/buttplug-lite/issues/2).
 
 ### Checking Battery
-Send an HTTP GET to `http://127.0.0.1:3031/batterystatus`. A 200 OK will be returned with body containing a plain text list of devices and battery levels. Devices are delimited by newlines, battery levels are delimitd by `:`. If the device has an unknown battery level a `-1` will be returned. Example:
+Send an HTTP GET to `http://127.0.0.1:3031/batterystatus`. A 200 OK will be returned with body containing a plain text list of devices and battery levels. Devices are delimited by newlines, battery levels are delimited by `:`. If the device has an unknown battery level a `-1` will be returned. Example:
 ```
 Lovense Edge:1
 Lovense Max:0.45

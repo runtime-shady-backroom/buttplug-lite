@@ -39,7 +39,7 @@ impl Configuration {
         }
     }
 
-    pub fn motor_from_tag(&self, tag: &String) -> Option<&Motor> {
+    pub fn motor_from_tag(&self, tag: &str) -> Option<&Motor> {
         self.tags.get(tag)
     }
 

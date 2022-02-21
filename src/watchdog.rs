@@ -28,15 +28,12 @@ pub fn start(watchdog_timeout_db: WatchdogTimeoutDb, buttplug_connector_db: Appl
                 println!("Watchdog violation! Halting all devices. To avoid this send an update at least every {}ms.", WATCHDOG_TIMEOUT.as_millis());
                 watchdog_timeout_db.store(i64::MAX, Ordering::Relaxed); // this prevents the message from spamming
                 let buttplug_connector_mutex = buttplug_connector_db.read().await;
-                match buttplug_connector_mutex.as_ref() {
-                    Some(buttplug_connector) => {
-                        match buttplug_connector.client.stop_all_devices().await {
-                            Ok(()) => (),
-                            Err(e) => eprintln!("watchdog: error halting devices: {:?}", e)
-                        }
+                if let Some(buttplug_connector) = buttplug_connector_mutex.as_ref() {
+                    match buttplug_connector.client.stop_all_devices().await {
+                        Ok(()) => (),
+                        Err(e) => eprintln!("watchdog: error halting devices: {:?}", e)
                     }
-                    None => () // do nothing because there is no server connected
-                }
+                } // else, do nothing because there is no server connected
             }
         }
     });

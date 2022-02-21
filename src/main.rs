@@ -36,7 +36,6 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
 use tracing::Level;
-use tracing_subscriber;
 use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
 
@@ -137,13 +136,13 @@ async fn tokio_main() {
         .and(with_db(application_state_db.clone()))
         .and_then(haptic_status_handler);
 
-    // GET /batterystatus => list of batery levels, spaced with newlines
+    // GET /batterystatus => list of battery levels, spaced with newlines
     let batterystatus = warp::path("batterystatus")
         .and(warp::get())
         .and(with_db(application_state_db.clone()))
         .and_then(battery_status_handler);
 
-    // GET /batterystatus => list of batery levels, spaced with newlines
+    // GET /batterystatus => list of battery levels, spaced with newlines
     let deviceconfig = warp::path("deviceconfig")
         .and(warp::get())
         .and(with_db(application_state_db.clone()))
@@ -399,7 +398,7 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
                 };
             }
         }
-        Err(_) => () // will try to reconnect later, no need to log this error
+        Err(e) => eprintln!("{}: failed to connect to server. Will retry shortly... ({:?})", LOG_PREFIX_BUTTPLUG_SERVER, e) // will try to reconnect later, may not need to log this error
     }
 }
 
@@ -411,7 +410,7 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
     let previous_state = std::mem::replace(lock.deref_mut(), None);
-    let result = match previous_state {
+    match previous_state {
         Some(ApplicationState { client, configuration: previous_configuration }) => {
             let new_port = configuration.port;
             *lock = Some(ApplicationState {
@@ -429,9 +428,7 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
             Ok(configuration)
         }
         None => Err("cannot update configuration until after initial haptic server startup".into())
-    };
-
-    result
+    }
 }
 
 async fn save_configuration(configuration: &Configuration) -> Result<(), String> {
@@ -572,7 +569,7 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
     match application_state_mutex.as_ref() {
         Some(application_state) => {
             let connected = application_state.client.connected();
-            let mut string = String::from(format!("device server running={}", connected));
+            let mut string = format!("device server running={}", connected);
             for device in application_state.client.devices() {
                 string.push_str(format!("\n  {}", device.name).as_str());
                 for (message_type, attributes) in device.allowed_messages.iter() {
@@ -659,59 +656,53 @@ async fn haptic_handler(
         };
 
         let application_state_mutex = application_state_db.read().await;
-        match application_state_mutex.as_ref() {
-            Some(application_state) => {
-                let device_map = build_vibration_map(&application_state.configuration, message);
+        if let Some(application_state) = application_state_mutex.as_ref() {
+            let device_map = build_vibration_map(&application_state.configuration, message);
 
-                let mut device_map = match device_map {
-                    Ok(map) => map,
-                    Err(e) => {
-                        eprintln!("{}: error parsing command: {}", LOG_PREFIX_HAPTIC_ENDPOINT, e);
-                        continue;
-                    }
-                };
-
-                for device in application_state.client.devices() {
-                    match device_map.remove(device.name.as_str()) {
-                        Some(motor_settings) => {
-                            let MotorSettings {
-                                speed_map,
-                                rotate_map,
-                                linear_map,
-                                contraction_hack,
-                            } = motor_settings;
-
-                            if !speed_map.is_empty() {
-                                match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
-                                    Ok(()) => (),
-                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
-                                }
-                            }
-                            if !rotate_map.is_empty() {
-                                match device.rotate(RotateCommand::RotateMap(rotate_map)).await {
-                                    Ok(()) => (),
-                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
-                                }
-                            }
-                            if !linear_map.is_empty() {
-                                match device.linear(LinearCommand::LinearMap(linear_map)).await {
-                                    Ok(()) => (),
-                                    Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
-                                }
-                            }
-                            if let Some(air_level) = contraction_hack {
-                                let command = format!("Air:Level:{};", air_level);
-                                device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
-                            }
-                        }
-                        None => () // ignore this device
-                    };
+            let mut device_map = match device_map {
+                Ok(map) => map,
+                Err(e) => {
+                    eprintln!("{}: error parsing command: {}", LOG_PREFIX_HAPTIC_ENDPOINT, e);
+                    continue;
                 }
-                drop(application_state_mutex); // prevent this section from requiring two locks
-                watchdog::feed(&watchdog_time).await;
+            };
+
+            for device in application_state.client.devices() {
+                if let Some(motor_settings) = device_map.remove(device.name.as_str()) {
+                    let MotorSettings {
+                        speed_map,
+                        rotate_map,
+                        linear_map,
+                        contraction_hack,
+                    } = motor_settings;
+
+                    if !speed_map.is_empty() {
+                        match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
+                            Ok(()) => (),
+                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                        }
+                    }
+                    if !rotate_map.is_empty() {
+                        match device.rotate(RotateCommand::RotateMap(rotate_map)).await {
+                            Ok(()) => (),
+                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                        }
+                    }
+                    if !linear_map.is_empty() {
+                        match device.linear(LinearCommand::LinearMap(linear_map)).await {
+                            Ok(()) => (),
+                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                        }
+                    }
+                    if let Some(air_level) = contraction_hack {
+                        let command = format!("Air:Level:{};", air_level);
+                        device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
+                    }
+                }; // else, ignore this device
             }
-            None => () // no server connected, so send no commands
-        }
+            drop(application_state_mutex); // prevent this section from requiring two locks
+            watchdog::feed(&watchdog_time).await;
+        } // else, no server connected, so send no commands
     }
     println!("{}: client connection lost", LOG_PREFIX_HAPTIC_ENDPOINT);
 }
@@ -753,7 +744,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                         };
 
                         devices.entry(motor.device_name.clone())
-                            .or_insert(MotorSettings::default())
+                            .or_insert_with(MotorSettings::default)
                             .speed_map
                             .insert(motor.feature_index, intensity);
                     }
@@ -777,7 +768,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                         };
 
                         devices.entry(motor.device_name.clone())
-                            .or_insert(MotorSettings::default())
+                            .or_insert_with(MotorSettings::default)
                             .linear_map
                             .insert(motor.feature_index, (duration, position));
                     }
@@ -797,7 +788,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                         }
 
                         devices.entry(motor.device_name.clone())
-                            .or_insert(MotorSettings::default())
+                            .or_insert_with(MotorSettings::default)
                             .rotate_map
                             .insert(motor.feature_index, (speed, direction));
                     }
@@ -812,7 +803,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                         };
 
                         devices.entry(motor.device_name.clone())
-                            .or_insert(MotorSettings::default())
+                            .or_insert_with(MotorSettings::default)
                             .contraction_hack = Some(air_level);
                     }
                 }

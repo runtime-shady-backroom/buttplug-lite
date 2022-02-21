@@ -135,7 +135,7 @@ impl Application for Gui {
     }
 
     fn title(&self) -> String {
-        format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).into()
+        format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 
     fn update(&mut self, message: Self::Message, _clipboard: &mut Clipboard) -> Command<Self::Message> {
@@ -481,7 +481,7 @@ fn render_motor_list(motors: &mut Vec<TaggedMotor>) -> Element<Message> {
     col.into()
 }
 
-fn render_device_list(devices: &Vec<DeviceStatus>) -> Element<Message> {
+fn render_device_list(devices: &[DeviceStatus]) -> Element<Message> {
     let col = Column::new()
         .spacing(TABLE_SPACING)
         .push(Text::new("Connected Devices").size(TEXT_SIZE_BIG));
@@ -504,28 +504,22 @@ async fn update_configuration(application_state_db: ApplicationStateDb, configur
     crate::update_configuration(&application_state_db, configuration, &warp_shutdown_tx).await
 }
 
-fn tags_from_application_status(motors: &Vec<TaggedMotor>) -> HashMap<String, Motor> {
+fn tags_from_application_status(motors: &[TaggedMotor]) -> HashMap<String, Motor> {
     motors.iter()
         .filter(|m| m.tag().is_some())
         .map(|m| (m.tag().unwrap().to_string(), m.motor.clone()))
         .collect()
 }
 
-fn build_example_message(motors: &Vec<TaggedMotor>) -> String {
+fn build_example_message(motors: &[TaggedMotor]) -> String {
     motors.iter()
         .flat_map(|motor| {
-            if let Some(tag) = motor.tag() {
-                Some(
-                    match motor.motor.feature_type {
-                        MotorType::Linear => format!("{}:20:0.5", tag),
-                        MotorType::Rotation => format!("{}:-0.5", tag),
-                        MotorType::Vibration => format!("{}:0.5", tag),
-                        MotorType::Contraction => format!("{}:3", tag),
-                    }
-                )
-            } else {
-                None
-            }
+            motor.tag().map(|tag| match motor.motor.feature_type {
+                MotorType::Linear => format!("{}:20:0.5", tag),
+                MotorType::Rotation => format!("{}:-0.5", tag),
+                MotorType::Vibration => format!("{}:0.5", tag),
+                MotorType::Contraction => format!("{}:3", tag),
+            })
         })
         .collect::<Vec<_>>()
         .join(";")
