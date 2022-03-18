@@ -28,7 +28,7 @@ use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServ
 use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
 use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
 use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
-use clap::{App, Arg};
+use clap::Parser;
 use directories::ProjectDirs;
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -41,6 +41,7 @@ use warp::Filter;
 
 use configuration::Configuration;
 
+use crate::cli_args::CliArgs;
 use crate::configuration::{Motor, MotorType};
 use crate::device_status::DeviceStatus;
 use crate::gui::window::TaggedMotor;
@@ -53,6 +54,7 @@ mod gui;
 mod executor;
 mod motor_settings;
 mod device_status;
+mod cli_args;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
@@ -97,21 +99,12 @@ fn main() {
 }
 
 async fn tokio_main() {
+    let args: CliArgs = CliArgs::parse();
+
     println!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-    let matches = App::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("runtime")
-        .about("Makes vibrators go brr")
-        .arg(Arg::with_name("v")
-            .short('v')
-            .multiple(true)
-            .help("Sets the level of verbosity"))
-        .get_matches();
-
-    let verbosity = matches.occurrences_of("v");
-    if verbosity > 0 {
-        let level = if verbosity > 1 {
+    if args.verbose > 0 {
+        let level = if args.verbose > 1 {
             Level::DEBUG
         } else {
             Level::INFO
