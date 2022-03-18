@@ -1,6 +1,6 @@
 [package]
 name = "buttplug-lite"
-version = "0.8.2"
+version = "1.0.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 description = "Makes vibrators go brr"
 edition = "2021"
@@ -14,8 +14,7 @@ futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "^5.0.0", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1.1.0
 serde = "^1.0.0"
 toml = "^0.5.0"
-app_dirs = "^1.2.1" # Purposely kept at old version because 2.0 is an empty library. This will be removed in version 1.0. Currently EVERY outdated dependency is due to this.
-directories = "^4.0.1" # replacement for app_dirs
+directories = "^4.0.1"
 iced = "^0.3.0"
 iced_native = "^0.4.0"
 lazy_static = "^1.4.0"

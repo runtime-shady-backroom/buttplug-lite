@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
-use app_dirs::{AppDataType, AppInfo};
 use buttplug::client::{
     ButtplugClient,
     ButtplugClientDevice,
@@ -68,11 +67,6 @@ static BUTTPLUG_CLIENT_NAME: &str = "in-process-client";
 // log prefixes:
 static LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
 static LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
-
-const APP_INFO: AppInfo = AppInfo {
-    name: env!("CARGO_PKG_NAME"),
-    author: "runtime",
-};
 
 static CONFIG_FILE_NAME: &str = "config.toml";
 static DEVICE_CONFIGURATION_JSON: &str = include_str!("resources/device_configuration.json");
@@ -323,18 +317,6 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
                     println!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
                     let loaded_configuration = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
                         .map_err(|e| format!("{:?}", e))
-                        .or_else(|error| {
-                            // this whole thing can be removed once enough users are migrated to the new config path
-                            println!("{}: New config missing {:?}, checking old config...", LOG_PREFIX_BUTTPLUG_SERVER, error);
-                            app_dirs::get_app_root(AppDataType::UserConfig, &APP_INFO)
-                                .map_err(|e| format!("app_dirs load: {:?}", e))
-                                .and_then(|old_config_path| {
-                                    let old_config_path = old_config_path.join(CONFIG_FILE_NAME);
-                                    println!("{}: Attempting to load old config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, old_config_path);
-                                    fs::read_to_string(old_config_path.as_path())
-                                        .map_err(|e| format!("app_dirs read: {:?}", e))
-                                })
-                        })
                         .and_then(|string| toml::from_str(&string).map_err(|e| format!("{:?}", e)));
                     let configuration = match loaded_configuration {
                         Ok(configuration) => configuration,
