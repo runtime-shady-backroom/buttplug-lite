@@ -104,7 +104,7 @@ async fn tokio_main() {
         .author("runtime")
         .about("Makes vibrators go brr")
         .arg(Arg::with_name("v")
-            .short("v")
+            .short('v')
             .multiple(true)
             .help("Sets the level of verbosity"))
         .get_matches();
