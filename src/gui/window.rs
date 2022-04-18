@@ -188,8 +188,6 @@ impl Application for Gui {
                             println!("save pressed");
                             state.saving = true;
 
-                            //TODO: notify user if port is invalid
-                            state.port = state.port_text.parse::<u16>().unwrap_or(state.port);
                             state.port_text = state.port.to_string();
 
                             // TODO: validate tags
@@ -212,6 +210,8 @@ impl Application for Gui {
                     }
                     Message::PortUpdated(new_port) => {
                         state.port_text = new_port;
+                        //TODO: notify user if port is invalid
+                        state.port = state.port_text.parse::<u16>().unwrap_or(state.port);
                         self.on_configuration_changed();
                         Command::none()
                     }
