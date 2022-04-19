@@ -26,7 +26,6 @@ use buttplug::server::comm_managers::btleplug::BtlePlugCommunicationManagerBuild
 use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
 use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
 use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
-use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
 use clap::Parser;
 use directories::ProjectDirs;
 use futures::StreamExt;
@@ -296,6 +295,7 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
     device_manager.add_comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default()).expect("failed to initialize Lovense connect");
 
     #[cfg(target_os = "windows")] {
+        use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
         device_manager.add_comm_manager(XInputDeviceCommunicationManagerBuilder::default()).unwrap();
     }
     let connector = ButtplugInProcessClientConnector::new(Some(server));
