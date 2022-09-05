@@ -1,4 +1,4 @@
-use iced::{button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input};
+use iced::{button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input, toggler};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
@@ -16,7 +16,7 @@ impl Default for Theme {
     }
 }
 
-impl From<Theme> for Box<dyn container::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn container::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
@@ -25,7 +25,7 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn radio::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn radio::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
@@ -34,7 +34,7 @@ impl From<Theme> for Box<dyn radio::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn text_input::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn text_input::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
@@ -43,7 +43,7 @@ impl From<Theme> for Box<dyn text_input::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn button::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn button::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => light::Button.into(),
@@ -52,7 +52,7 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn scrollable::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn scrollable::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
@@ -61,7 +61,7 @@ impl From<Theme> for Box<dyn scrollable::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn slider::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn slider::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
@@ -79,11 +79,20 @@ impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn checkbox::StyleSheet> {
+impl<'a> From<Theme> for Box<dyn checkbox::StyleSheet + 'a> {
     fn from(theme: Theme) -> Self {
         match theme {
             Theme::Light => Default::default(),
             Theme::Dark => dark::Checkbox.into(),
+        }
+    }
+}
+
+impl From<Theme> for Box<dyn toggler::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Default::default(),
+            Theme::Dark => dark::Toggler.into(),
         }
     }
 }
@@ -125,8 +134,8 @@ mod light {
 
 mod dark {
     use iced::{
-        button, checkbox, Color, container, progress_bar, radio, rule,
-        scrollable, slider, text_input,
+        button, checkbox, container, progress_bar, radio, rule, scrollable,
+        slider, text_input, toggler, Color,
     };
 
     const SURFACE: Color = Color::from_rgb(
@@ -174,7 +183,7 @@ mod dark {
                 dot_color: ACTIVE,
                 border_width: 1.0,
                 border_color: ACTIVE,
-                text_color: None
+                text_color: None,
             }
         }
 
@@ -363,7 +372,7 @@ mod dark {
                 border_radius: 2.0,
                 border_width: 1.0,
                 border_color: ACTIVE,
-                text_color: None
+                text_color: None,
             }
         }
 
@@ -375,6 +384,35 @@ mod dark {
                 }
                     .into(),
                 ..self.active(is_checked)
+            }
+        }
+    }
+
+    pub struct Toggler;
+
+    impl toggler::StyleSheet for Toggler {
+        fn active(&self, is_active: bool) -> toggler::Style {
+            toggler::Style {
+                background: if is_active { ACTIVE } else { SURFACE },
+                background_border: None,
+                foreground: if is_active { Color::WHITE } else { ACTIVE },
+                foreground_border: None,
+            }
+        }
+
+        fn hovered(&self, is_active: bool) -> toggler::Style {
+            toggler::Style {
+                background: if is_active { ACTIVE } else { SURFACE },
+                background_border: None,
+                foreground: if is_active {
+                    Color {
+                        a: 0.5,
+                        ..Color::WHITE
+                    }
+                } else {
+                    Color { a: 0.5, ..ACTIVE }
+                },
+                foreground_border: None,
             }
         }
     }
