@@ -240,7 +240,6 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::Tick => {
-                        println!("tick event");
                         Command::none()
                     }
                 }
