@@ -327,7 +327,7 @@ async fn start_buttplug_server(
             };
 
             // reuse old config, or load from disk if this is the initial connection
-            let previous_state = std::mem::replace(application_state_mutex.deref_mut(), None);
+            let previous_state = application_state_mutex.deref_mut().take();
             let configuration = match previous_state {
                 Some(ApplicationState { configuration, client: _ }) => configuration,
                 None => {
@@ -400,14 +400,14 @@ async fn start_buttplug_server(
     }
 }
 
-fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=std::convert::Infallible> + Clone {
+fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=convert::Infallible> + Clone {
     warp::any().map(move || db.clone())
 }
 
 pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: Configuration, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<Configuration, String> {
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
-    let previous_state = std::mem::replace(lock.deref_mut(), None);
+    let previous_state = lock.deref_mut().take();
     match previous_state {
         Some(ApplicationState { client, configuration: previous_configuration }) => {
             let new_port = configuration.port;
