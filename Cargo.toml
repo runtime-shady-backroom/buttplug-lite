@@ -11,7 +11,7 @@ edition = "2021"
 tokio = { version = "^1.0.0", features = ["full"] }
 warp = "^0.3.0" # uses tokio 1.0
 futures = { version = "^0.3.0", default-features = false }
-buttplug = { version = "^5.0.0", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1.1.0
+buttplug = { version = "=5.1.8", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1.1.0
 serde = "^1.0.0"
 toml = "^0.5.0"
 directories = "^4.0.1"
