@@ -42,6 +42,7 @@ use configuration::Configuration;
 use crate::cli_args::CliArgs;
 use crate::configuration::{Motor, MotorType};
 use crate::device_status::DeviceStatus;
+use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
 use crate::gui::window::TaggedMotor;
 use crate::motor_settings::MotorSettings;
 use crate::watchdog::WatchdogTimeoutDb;
@@ -154,6 +155,17 @@ async fn tokio_main() {
     // used to send initial port over from the configuration load
     let (initial_config_loaded_tx, initial_config_loaded_rx) = oneshot::channel::<()>();
     let mut initial_config_loaded_tx = Some(initial_config_loaded_tx);
+    let (application_status_sender, application_status_receiver) = mpsc::unbounded_channel::<ApplicationStatusEvent>();
+
+    // test ticks
+    let test_tick_sender = application_status_sender.clone();
+    task::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(10000));
+        loop {
+            interval.tick().await;
+            test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FREAKING RECEIVER?");
+        }
+    });
 
     // connector clone moved into reconnect task
     let reconnector_application_state_clone = application_state_db.clone();
@@ -164,7 +176,7 @@ async fn tokio_main() {
     task::spawn(async move {
         loop {
             // we reconnect here regardless of server state
-            start_buttplug_server(reconnector_application_state_clone.clone(), initial_config_loaded_tx).await; // will "block" until disconnect
+            start_buttplug_server(reconnector_application_state_clone.clone(), initial_config_loaded_tx, application_status_sender.clone()).await; // will "block" until disconnect
             initial_config_loaded_tx = None; // only Some() for the first loop
             tokio::time::sleep(Duration::from_millis(BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
         }
@@ -239,7 +251,8 @@ async fn tokio_main() {
         //TODO: wait for buttplug to notice devices
         let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
-        gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices); // blocking call
+        let subscription = ApplicationStatusSubscriptionProvider::new(application_status_receiver);
+        gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices, subscription); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.
@@ -276,7 +289,11 @@ fn create_tokio_runtime() -> tokio::runtime::Runtime {
 
 // start server, then while running process events
 // returns only when we disconnect from the server
-async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial_config_loaded_tx: Option<Sender<()>>) {
+async fn start_buttplug_server(
+    application_state_db: ApplicationStateDb,
+    initial_config_loaded_tx: Option<Sender<()>>,
+    application_status_event_sender: UnboundedSender<ApplicationStatusEvent>,
+) {
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
@@ -356,8 +373,14 @@ async fn start_buttplug_server(application_state_db: ApplicationStateDb, initial
             loop {
                 match event_stream.next().await {
                     Some(event) => match event {
-                        ButtplugClientEvent::DeviceAdded(dev) => println!("{}: device connected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name),
-                        ButtplugClientEvent::DeviceRemoved(dev) => println!("{}: device disconnected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name),
+                        ButtplugClientEvent::DeviceAdded(dev) => {
+                            println!("{}: device connected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name);
+                            application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
+                        }
+                        ButtplugClientEvent::DeviceRemoved(dev) => {
+                            println!("{}: device disconnected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name);
+                            application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
+                        }
                         ButtplugClientEvent::PingTimeout => println!("{}: ping timeout", LOG_PREFIX_BUTTPLUG_SERVER),
                         ButtplugClientEvent::Error(e) => println!("{}: server error: {:?}", LOG_PREFIX_BUTTPLUG_SERVER, e),
                         ButtplugClientEvent::ScanningFinished => println!("{}: device scan finished", LOG_PREFIX_BUTTPLUG_SERVER),
@@ -517,8 +540,7 @@ fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClient
     match device_type.get_type() {
         Some(message_type) => {
             device.allowed_messages.get(&message_type)
-                .map(|attributes| attributes.feature_count)
-                .flatten()
+                .and_then(|attributes| attributes.feature_count)
                 .unwrap_or(0)
         }
         None => {
@@ -705,7 +727,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
             Some(tag) => tag,
             None => return Err(format!("could not extract motor tag from {}", line))
         };
-        match configuration.motor_from_tag(&tag.to_string()) {
+        match configuration.motor_from_tag(tag) {
             Some(motor) => {
                 match motor.feature_type {
                     MotorType::Vibration => {

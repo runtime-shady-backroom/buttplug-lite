@@ -9,6 +9,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "^1.0.0", features = ["full"] }
+tokio-stream = "^0.1.8"
 warp = "^0.3.0" # uses tokio 1.0
 futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "=5.1.8", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1.1.0
@@ -17,6 +18,7 @@ toml = "^0.5.0"
 directories = "^4.0.1"
 iced = "^0.4.2"
 iced_native = "^0.5.1"
+iced_futures = "^0.4.1"
 lazy_static = "^1.4.0"
 tracing = "^0.1.0"
 tracing-subscriber = "^0.3.0"

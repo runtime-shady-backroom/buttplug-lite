@@ -8,10 +8,11 @@ use iced::widget::{button, Button, Column, Container, Row, scrollable, Scrollabl
 use iced_native::{Event, window};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage};
+use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
 use crate::configuration::{Configuration, Motor, MotorType};
 use crate::device_status::DeviceStatus;
 use crate::executor::TokioExecutor;
+use crate::gui::subscription::ApplicationStatusSubscriptionProvider;
 
 use super::theme::Theme;
 
@@ -30,6 +31,7 @@ pub fn run(
     application_state_db: ApplicationStateDb,
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
     initial_devices: ApplicationStatus,
+    application_status_subscription: ApplicationStatusSubscriptionProvider,
 ) {
     let settings = Settings {
         id: Some("buttplug-lite".to_string()),
@@ -38,6 +40,7 @@ pub fn run(
             warp_restart_tx: warp_shutdown_tx.clone(),
             application_state_db,
             initial_application_status: initial_devices,
+            application_status_subscription,
         },
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
@@ -58,17 +61,19 @@ struct Flags {
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
     initial_application_status: ApplicationStatus,
+    application_status_subscription: ApplicationStatusSubscriptionProvider,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     SaveConfigurationRequest,
-    RefreshDevicesRequest,
+    RefreshDevices,
     RefreshDevicesComplete(Option<ApplicationStatus>),
     SaveConfigurationComplete(Result<Configuration, String>),
     PortUpdated(String),
     MotorMessage(usize, MotorMessage),
-    EventOccurred(iced_native::Event),
+    NativeEventOccurred(Event),
+    Tick,
 }
 
 enum Gui {
@@ -85,7 +90,6 @@ struct State {
     port_text: String,
     port_input: text_input::State,
     save_configuration_button: button::State,
-    refresh_devices_button: button::State,
     restart_warp_button: button::State,
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
@@ -93,6 +97,7 @@ struct State {
     configuration_dirty: bool,
     saving: bool,
     last_configuration: Configuration,
+    application_status_subscription: ApplicationStatusSubscriptionProvider,
 }
 
 impl Gui {
@@ -109,7 +114,6 @@ impl Gui {
             port_text: port.to_string(),
             port_input: Default::default(),
             save_configuration_button: Default::default(),
-            refresh_devices_button: Default::default(),
             restart_warp_button: Default::default(),
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
@@ -117,6 +121,7 @@ impl Gui {
             configuration_dirty: Configuration::is_version_outdated(config_version),
             saving: false,
             last_configuration: configuration,
+            application_status_subscription: flags.application_status_subscription,
         })
     }
 
@@ -149,8 +154,8 @@ impl Application for Gui {
             }
             Gui::Loaded(state) => {
                 match message {
-                    Message::RefreshDevicesRequest => {
-                        println!("refresh pressed");
+                    Message::RefreshDevices => {
+                        println!("device refresh triggered");
                         Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::RefreshDevicesComplete(application_status) => {
@@ -165,7 +170,6 @@ impl Application for Gui {
                                     port_text: old_state.port_text,
                                     port_input: old_state.port_input,
                                     save_configuration_button: old_state.save_configuration_button,
-                                    refresh_devices_button: old_state.refresh_devices_button,
                                     restart_warp_button: old_state.restart_warp_button,
                                     warp_restart_tx: old_state.warp_restart_tx,
                                     application_state_db: old_state.application_state_db,
@@ -173,6 +177,7 @@ impl Application for Gui {
                                     configuration_dirty: old_state.configuration_dirty,
                                     saving: old_state.saving,
                                     last_configuration: old_state.last_configuration,
+                                    application_status_subscription: old_state.application_status_subscription,
                                 });
                             } else {
                                 // this should never happen
@@ -227,11 +232,15 @@ impl Application for Gui {
                         self.on_configuration_changed();
                         Command::none()
                     }
-                    Message::EventOccurred(event) => {
+                    Message::NativeEventOccurred(event) => {
                         if let Event::Window(window::Event::CloseRequested) = event {
                             println!("received gui shutdown request"); //TODO: actually run shutdown code
                             state.should_exit = true;
                         }
+                        Command::none()
+                    }
+                    Message::Tick => {
+                        println!("tick event");
                         Command::none()
                     }
                 }
@@ -239,11 +248,26 @@ impl Application for Gui {
         }
     }
 
+    // this is called many times in strange and mysterious ways
     fn subscription(&self) -> Subscription<Message> {
-        iced_native::subscription::events().map(Message::EventOccurred)
+        let native_events = iced_native::subscription::events()
+            .map(Message::NativeEventOccurred);
+
+        match self {
+            Gui::Loaded(state) => {
+                let application_events = state.application_status_subscription.subscribe()
+                    .map(|event| match event {
+                        ApplicationStatusEvent::DeviceAdded => Message::RefreshDevices,
+                        ApplicationStatusEvent::DeviceRemoved => Message::RefreshDevices,
+                        ApplicationStatusEvent::Tick(_) => Message::Tick
+                    });
+                Subscription::batch(vec![application_events, native_events])
+            }
+            Gui::Loading => native_events,
+        }
     }
 
-    fn view(&mut self) -> Element<'_, Self::Message> {
+    fn view(&mut self) -> Element<Message> {
         match self {
             Gui::Loading => {
                 Container::new(
@@ -279,11 +303,6 @@ impl Application for Gui {
                         .width(Length::Fill)
                         .push(Row::new()
                             .spacing(TABLE_SPACING)
-                            .push(
-                                Button::new(&mut state.refresh_devices_button, Text::new("refresh devices"))
-                                    .style(STYLE)
-                                    .on_press(Message::RefreshDevicesRequest)
-                            )
                             .push(save_button)
                         )
                         .push(Row::new()
