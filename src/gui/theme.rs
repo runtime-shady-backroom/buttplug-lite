@@ -174,6 +174,7 @@ mod dark {
                 dot_color: ACTIVE,
                 border_width: 1.0,
                 border_color: ACTIVE,
+                text_color: None
             }
         }
 
@@ -362,6 +363,7 @@ mod dark {
                 border_radius: 2.0,
                 border_width: 1.0,
                 border_color: ACTIVE,
+                text_color: None
             }
         }
 

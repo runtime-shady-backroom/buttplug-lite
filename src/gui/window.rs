@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{Align, Application, button, Button, Clipboard, Column, Command, Container, Element, Length, Row, Rule, scrollable, Scrollable, Settings, Subscription, Text, text_input, TextInput};
+use iced::{alignment::Alignment, Application, Command, Element, Length, Rule, Settings, Subscription};
+use iced::widget::{button, Button, Column, Container, Row, scrollable, Scrollable, Text, text_input, TextInput};
 use iced_native::{Event, window};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -31,6 +32,7 @@ pub fn run(
     initial_devices: ApplicationStatus,
 ) {
     let settings = Settings {
+        id: Some("buttplug-lite".to_string()),
         window: Default::default(),
         flags: Flags {
             warp_restart_tx: warp_shutdown_tx.clone(),
@@ -41,6 +43,8 @@ pub fn run(
         default_text_size: TEXT_SIZE_DEFAULT,
         antialiasing: true,
         exit_on_close_request: false,
+        text_multithreading: false,
+        try_opengles_first: false,
     };
 
     Gui::run(settings).expect("could not instantiate window");
@@ -138,7 +142,7 @@ impl Application for Gui {
         format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 
-    fn update(&mut self, message: Self::Message, _clipboard: &mut Clipboard) -> Command<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match self {
             Gui::Loading => {
                 Command::none()
@@ -284,7 +288,7 @@ impl Application for Gui {
                         )
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
-                            .align_items(Align::Center)
+                            .align_items(Alignment::Center)
                             .push(input_label("Server port:"))
                             .push(
                                 TextInput::new(&mut state.port_input, "server port", state.port_text.as_str(), Message::PortUpdated)
@@ -434,7 +438,7 @@ impl TaggedMotor {
     fn view(&mut self) -> Element<MotorMessage> {
         let row = Row::new()
             .spacing(EOL_INPUT_SPACING)
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(input_label(format!("{}", &self.motor)));
 
         let row = match &mut self.state {
