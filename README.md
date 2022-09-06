@@ -102,7 +102,22 @@ Possible device types are: `linear`, `rotation`, `vibration`, and `contraction`.
 Prior to version 0.7.0 this endpoint is a 404.
 
 ### Checking the Status
-Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. This response is intended for debugging and is not intended to be parsed. If you have a use case that requires parsing device status let me know at [issue #2](https://github.com/runtime-shady-backroom/buttplug-lite/issues/2).
+Send an HTTP GET to `http://127.0.0.1:3031/hapticstatus`. A 200 OK will be returned with body containing a plain text summary of the connection status and connected devices. **This response is intended for debugging and is not intended to be parsed.** The response structure is subject to change. If you have a use case that requires parsing device status let me know by opening an issue.
+
+Example response:
+```
+device server running=true
+  Lovense Edge
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
+  Lovense Hush
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
+  Lovense Max
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Vibrator", actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Air Pump", actuator_type: Constrict, step_count: 5 }
+  The Handy
+    LinearCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Position, step_count: 100 }
+```
 
 ### Checking Battery
 Send an HTTP GET to `http://127.0.0.1:3031/batterystatus`. A 200 OK will be returned with body containing a plain text list of devices and battery levels. Devices are delimited by newlines, battery levels are delimited by `:`. If the device has an unknown battery level a `-1` will be returned. Example:

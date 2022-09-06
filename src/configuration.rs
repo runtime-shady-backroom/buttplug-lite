@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
+use buttplug::core::message::ButtplugDeviceMessageType;
 use serde::{Deserialize, Serialize};
 
 const CURRENT_VERSION: i32 = 2;
@@ -92,11 +92,11 @@ pub enum MotorType {
 }
 
 impl MotorType {
-    pub fn get_type(&self) -> Option<ButtplugCurrentSpecDeviceMessageType> {
+    pub fn get_type(&self) -> Option<ButtplugDeviceMessageType> {
         match self {
-            MotorType::Vibration => Some(ButtplugCurrentSpecDeviceMessageType::VibrateCmd),
-            MotorType::Linear => Some(ButtplugCurrentSpecDeviceMessageType::LinearCmd),
-            MotorType::Rotation => Some(ButtplugCurrentSpecDeviceMessageType::RotateCmd),
+            MotorType::Vibration => Some(ButtplugDeviceMessageType::VibrateCmd),
+            MotorType::Linear => Some(ButtplugDeviceMessageType::LinearCmd),
+            MotorType::Rotation => Some(ButtplugDeviceMessageType::RotateCmd),
             MotorType::Contraction => None
         }
     }

@@ -18,14 +18,13 @@ use buttplug::client::{
     device::RotateCommand,
     device::VibrateCommand,
 };
-use buttplug::connector::ButtplugInProcessClientConnector;
-use buttplug::core::messages::ButtplugCurrentSpecDeviceMessageType;
-use buttplug::device::Endpoint;
+use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
+use buttplug::core::message::ButtplugDeviceMessageType;
 use buttplug::server::ButtplugServerBuilder;
-use buttplug::server::comm_managers::btleplug::BtlePlugCommunicationManagerBuilder;
-use buttplug::server::comm_managers::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
-use buttplug::server::comm_managers::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
-use buttplug::server::comm_managers::serialport::SerialPortCommunicationManagerBuilder;
+use buttplug::server::device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder;
+use buttplug::server::device::hardware::communication::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
+use buttplug::server::device::hardware::communication::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
+use buttplug::server::device::hardware::communication::serialport::SerialPortCommunicationManagerBuilder;
 use clap::Parser;
 use directories::ProjectDirs;
 use futures::StreamExt;
@@ -69,7 +68,6 @@ static LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
 static LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
 
 static CONFIG_FILE_NAME: &str = "config.toml";
-static DEVICE_CONFIGURATION_JSON: &str = include_str!("resources/device_configuration.json");
 
 lazy_static! {
     static ref CONFIG_DIR_FILE_PATH: PathBuf = create_config_file_path();
@@ -297,25 +295,27 @@ async fn start_buttplug_server(
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
-
-    let server = ButtplugServerBuilder::default()
+    let mut server_builder = ButtplugServerBuilder::default();
+    server_builder
         .name("buttplug-lite")
-        .user_device_configuration_json(Some(DEVICE_CONFIGURATION_JSON.into()))
-        .finish()
-        .expect("Failed to initialize buttplug server");
-    let device_manager = server.device_manager();
-
-    device_manager.add_comm_manager(BtlePlugCommunicationManagerBuilder::default()).expect("failed to initialize BtlePlug");
-    device_manager.add_comm_manager(SerialPortCommunicationManagerBuilder::default()).expect("failed to initialize serial port");
-    device_manager.add_comm_manager(LovenseHIDDongleCommunicationManagerBuilder::default()).expect("failed to initialize Lovense HID dongle");
-    device_manager.add_comm_manager(LovenseSerialDongleCommunicationManagerBuilder::default()).expect("failed to initialize Lovense serial dongle");
-    device_manager.add_comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default()).expect("failed to initialize Lovense connect");
+        .comm_manager(BtlePlugCommunicationManagerBuilder::default())
+        .comm_manager(SerialPortCommunicationManagerBuilder::default())
+        .comm_manager(LovenseHIDDongleCommunicationManagerBuilder::default())
+        .comm_manager(LovenseSerialDongleCommunicationManagerBuilder::default())
+        .comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default());
 
     #[cfg(target_os = "windows")] {
-        use buttplug::server::comm_managers::xinput::XInputDeviceCommunicationManagerBuilder;
-        device_manager.add_comm_manager(XInputDeviceCommunicationManagerBuilder::default()).unwrap();
+        use buttplug::server::device::hardware::communication::xinput::XInputDeviceCommunicationManagerBuilder;
+        server_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
     }
-    let connector = ButtplugInProcessClientConnector::new(Some(server));
+
+    let server = server_builder
+        .finish()
+        .expect("Failed to initialize buttplug server");
+
+    let connector = ButtplugInProcessClientConnectorBuilder::default()
+        .server(server)
+        .finish();
 
     match buttplug_client.connect(connector).await {
         Ok(()) => {
@@ -374,11 +374,11 @@ async fn start_buttplug_server(
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => {
-                            println!("{}: device connected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name);
+                            println!("{}: device connected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
                         }
                         ButtplugClientEvent::DeviceRemoved(dev) => {
-                            println!("{}: device disconnected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name);
+                            println!("{}: device disconnected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
                         }
                         ButtplugClientEvent::PingTimeout => println!("{}: ping timeout", LOG_PREFIX_BUTTPLUG_SERVER),
@@ -498,15 +498,18 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
 
     for device in devices.iter() {
-        let battery_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::BatteryLevelCmd) {
-            Some(_battery_message_attributes) => device.battery_level().await.ok(),
-            None => None
+
+        let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
+            device.battery_level().await.ok()
+        } else {
+            None
         };
-        let rssi_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::RSSILevelCmd) {
-            Some(_rssi_message_attributes) => device.rssi_level().await.ok(),
-            None => None
+        let rssi_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::RSSILevelCmd) {
+            device.rssi_level().await.ok()
+        } else {
+            None
         };
-        let name = device.name.clone();
+        let name: String = device.name().to_string();
         device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
     }
 
@@ -514,14 +517,14 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
         .flat_map(|device| {
             MotorType::iter()
                 .flat_map(move |feature_type| {
-                    let device_name = device.name.clone();
+                    let device_name = device.name().clone();
 
                     let feature_count = device_feature_count_by_type(feature_type, &device);
                     let feature_range = 0..feature_count;
                     feature_range.into_iter()
                         .map(move |feature_index| {
                             Motor {
-                                device_name: device_name.clone(),
+                                device_name: device_name.to_string(),
                                 feature_index,
                                 feature_type: feature_type.clone(),
                             }
@@ -539,14 +542,16 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
 fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClientDevice) -> u32 {
     match device_type.get_type() {
         Some(message_type) => {
-            device.allowed_messages.get(&message_type)
-                .and_then(|attributes| attributes.feature_count)
-                .unwrap_or(0)
+            //TODO:
+            // device.allowed_messages.get(&message_type)
+            //     .and_then(|attributes| attributes.feature_count)
+            //     .unwrap_or(0)
+            0
         }
         None => {
             match device_type {
                 MotorType::Contraction => {
-                    if device.name == "Lovense Max" && device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::RawWriteCmd).is_some() {
+                    if device.name() == "Lovense Max" && device.message_attributes().message_allowed(&ButtplugDeviceMessageType::RawWriteCmd) {
                         1
                     } else {
                         0
@@ -568,8 +573,23 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
             let connected = application_state.client.connected();
             let mut string = format!("device server running={}", connected);
             for device in application_state.client.devices() {
-                string.push_str(format!("\n  {}", device.name).as_str());
-                for (message_type, attributes) in device.allowed_messages.iter() {
+                string.push_str(format!("\n  {}", device.name()).as_str());
+
+                let scalar_cmds = device.message_attributes().scalar_cmd().iter()
+                    .flat_map(|inner| inner.iter())
+                    .map(|value| (ButtplugDeviceMessageType::ScalarCmd, value));
+
+                let rotate_cmds = device.message_attributes().rotate_cmd().iter()
+                    .flat_map(|inner| inner.iter())
+                    .map(|value| (ButtplugDeviceMessageType::RotateCmd, value));
+
+                let linear_cmds = device.message_attributes().linear_cmd().iter()
+                    .flat_map(|inner| inner.iter())
+                    .map(|value| (ButtplugDeviceMessageType::LinearCmd, value));
+
+                let attributes = scalar_cmds.chain(rotate_cmds).chain(linear_cmds);
+
+                for (message_type, attributes) in attributes {
                     string.push_str(format!("\n    {:?}: {:?}", message_type, attributes).as_str());
                 }
             }
@@ -586,11 +606,12 @@ async fn battery_status_handler(application_state_db: ApplicationStateDb) -> Res
         Some(application_state) => {
             let mut string = String::new();
             for device in application_state.client.devices() {
-                let battery_level = match device.allowed_messages.get(&ButtplugCurrentSpecDeviceMessageType::BatteryLevelCmd) {
-                    Some(_battery_message_attributes) => device.battery_level().await.ok(),
-                    None => None
+                let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
+                    device.battery_level().await.ok()
+                } else {
+                    None
                 };
-                string.push_str(format!("{}:{}\n", device.name, battery_level.unwrap_or(-1.0)).as_str());
+                string.push_str(format!("{}:{}\n", device.name(), battery_level.unwrap_or(-1.0)).as_str());
             }
             Ok(string)
         }
@@ -665,7 +686,7 @@ async fn haptic_handler(
             };
 
             for device in application_state.client.devices() {
-                if let Some(motor_settings) = device_map.remove(device.name.as_str()) {
+                if let Some(motor_settings) = device_map.remove(device.name()) {
                     let MotorSettings {
                         speed_map,
                         rotate_map,
@@ -674,26 +695,27 @@ async fn haptic_handler(
                     } = motor_settings;
 
                     if !speed_map.is_empty() {
-                        match device.vibrate(VibrateCommand::SpeedMap(speed_map)).await {
+                        match device.vibrate(&VibrateCommand::SpeedMap(speed_map)).await {
                             Ok(()) => (),
                             Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                         }
                     }
                     if !rotate_map.is_empty() {
-                        match device.rotate(RotateCommand::RotateMap(rotate_map)).await {
+                        match device.rotate(&RotateCommand::RotateMap(rotate_map)).await {
                             Ok(()) => (),
                             Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                         }
                     }
                     if !linear_map.is_empty() {
-                        match device.linear(LinearCommand::LinearMap(linear_map)).await {
+                        match device.linear(&LinearCommand::LinearMap(linear_map)).await {
                             Ok(()) => (),
                             Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                         }
                     }
                     if let Some(air_level) = contraction_hack {
-                        let command = format!("Air:Level:{};", air_level);
-                        device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
+                        todo!()
+                        //let command = format!("Air:Level:{};", air_level);
+                        //device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
                     }
                 }; // else, ignore this device
             }
