@@ -196,7 +196,7 @@ async fn tokio_main() {
     // test ticks
     let test_tick_sender = application_status_sender.clone();
     task::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(10000));
+        let mut interval = tokio::time::interval(Duration::from_secs(30));
         loop {
             interval.tick().await;
             test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FREAKING RECEIVER?");
@@ -647,6 +647,9 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
             let mut string = format!("device server running={}", connected);
             for device in application_state.client.devices() {
                 string.push_str(format!("\n  {}", device.name()).as_str());
+                if let Some(display_name) = device.display_name() {
+                    string.push_str(format!(" [{}]", display_name).as_str());
+                }
 
                 let scalar_cmds = device.message_attributes().scalar_cmd().iter()
                     .flat_map(|inner| inner.iter())

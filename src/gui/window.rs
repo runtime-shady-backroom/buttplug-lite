@@ -250,7 +250,8 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::Tick => {
-                        Command::none()
+                        // this should keep battery levels reasonably up to date
+                        Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::UpdateButtonPressed => {
                         let update_url: &str = state.update_url.as_ref().expect("Somehow pressed the update button without it visible!?").as_str();
