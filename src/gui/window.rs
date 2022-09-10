@@ -9,7 +9,7 @@ use iced_native::{Event, window};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
-use crate::configuration::{Configuration, Motor, MotorType};
+use crate::configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::device_status::DeviceStatus;
 use crate::executor::TokioExecutor;
 use crate::gui::subscription::ApplicationStatusSubscriptionProvider;
@@ -69,7 +69,7 @@ enum Message {
     SaveConfigurationRequest,
     RefreshDevices,
     RefreshDevicesComplete(Option<ApplicationStatus>),
-    SaveConfigurationComplete(Result<Configuration, String>),
+    SaveConfigurationComplete(Result<ConfigurationV3, String>),
     PortUpdated(String),
     MotorMessage(usize, MotorMessage),
     NativeEventOccurred(Event),
@@ -96,7 +96,7 @@ struct State {
     should_exit: bool,
     configuration_dirty: bool,
     saving: bool,
-    last_configuration: Configuration,
+    last_configuration: ConfigurationV3,
     application_status_subscription: ApplicationStatusSubscriptionProvider,
 }
 
@@ -118,7 +118,7 @@ impl Gui {
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
             should_exit: false,
-            configuration_dirty: Configuration::is_version_outdated(config_version),
+            configuration_dirty: ConfigurationV3::is_version_outdated(config_version),
             saving: false,
             last_configuration: configuration,
             application_status_subscription: flags.application_status_subscription,
@@ -128,7 +128,7 @@ impl Gui {
     fn on_configuration_changed(&mut self) {
         if let Gui::Loaded(state) = self {
             // what the new configuration would be if we saved now
-            let new_configuration = Configuration::new(state.port, tags_from_application_status(&state.motors));
+            let new_configuration = ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
             state.configuration_dirty = new_configuration != state.last_configuration;
         }
     }
@@ -200,7 +200,7 @@ impl Application for Gui {
                             state.port_text = state.port.to_string();
 
                             // TODO: validate tags
-                            let configuration = Configuration::new(state.port, tags_from_application_status(&state.motors));
+                            let configuration = ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
                             Command::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
                         }
                     }
@@ -359,7 +359,7 @@ impl Application for Gui {
 /// an optionally tagged motor
 #[derive(Clone, Debug)]
 pub struct TaggedMotor {
-    pub motor: Motor,
+    pub motor: MotorConfigurationV3,
     tag_text: text_input::State,
     state: TaggedMotorState,
 }
@@ -406,7 +406,7 @@ impl Display for TaggedMotor {
 }
 
 impl TaggedMotor {
-    pub fn new(motor: Motor, tag: Option<String>) -> Self {
+    pub fn new(motor: MotorConfigurationV3, tag: Option<String>) -> Self {
         let state = match tag {
             Some(tag) => TaggedMotorState::Tagged {
                 tag,
@@ -522,11 +522,11 @@ async fn get_tagged_devices(application_state_db: ApplicationStateDb) -> Option<
     crate::get_tagged_devices(&application_state_db).await
 }
 
-async fn update_configuration(application_state_db: ApplicationStateDb, configuration: Configuration, warp_shutdown_tx: UnboundedSender<ShutdownMessage>) -> Result<Configuration, String> {
+async fn update_configuration(application_state_db: ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
     crate::update_configuration(&application_state_db, configuration, &warp_shutdown_tx).await
 }
 
-fn tags_from_application_status(motors: &[TaggedMotor]) -> HashMap<String, Motor> {
+fn tags_from_application_status(motors: &[TaggedMotor]) -> HashMap<String, MotorConfigurationV3> {
     motors.iter()
         .filter(|m| m.tag().is_some())
         .map(|m| (m.tag().unwrap().to_string(), m.motor.clone()))
@@ -537,10 +537,9 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
     motors.iter()
         .flat_map(|motor| {
             motor.tag().map(|tag| match motor.motor.feature_type {
-                MotorType::Linear => format!("{}:20:0.5", tag),
-                MotorType::Rotation => format!("{}:-0.5", tag),
-                MotorType::Vibration => format!("{}:0.5", tag),
-                MotorType::Contraction => format!("{}:3", tag),
+                MotorTypeV3::Linear => format!("{}:20:0.5", tag),
+                MotorTypeV3::Rotation => format!("{}:-0.5", tag),
+                MotorTypeV3::Scalar(_) => format!("{}:0.5", tag),
             })
         })
         .collect::<Vec<_>>()

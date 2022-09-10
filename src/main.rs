@@ -10,14 +10,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
-use buttplug::client::{
-    ButtplugClient,
-    ButtplugClientDevice,
-    ButtplugClientEvent,
-    device::LinearCommand,
-    device::RotateCommand,
-    device::VibrateCommand,
-};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, device::LinearCommand, device::RotateCommand, device::VibrateCommand, ScalarCommand};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
 use buttplug::core::message::ButtplugDeviceMessageType;
 use buttplug::server::ButtplugServerBuilder;
@@ -36,23 +29,28 @@ use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
 
-use configuration::Configuration;
+use cli_args::CliArgs;
+use configuration_minimal::ConfigurationMinimal;
+use configuration_v2::ConfigurationV2;
+use configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
+use device_status::DeviceStatus;
+use gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
+use gui::window::TaggedMotor;
+use motor_settings::MotorSettings;
+use watchdog::WatchdogTimeoutDb;
 
-use crate::cli_args::CliArgs;
-use crate::configuration::{Motor, MotorType};
-use crate::device_status::DeviceStatus;
-use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
-use crate::gui::window::TaggedMotor;
-use crate::motor_settings::MotorSettings;
-use crate::watchdog::WatchdogTimeoutDb;
-
-mod configuration;
+mod configuration_v2;
 mod watchdog;
 mod gui;
 mod executor;
 mod motor_settings;
 mod device_status;
 mod cli_args;
+mod configuration_v3;
+mod configuration_minimal;
+
+
+pub const CONFIG_VERSION: i32 = 3;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
@@ -77,7 +75,7 @@ lazy_static! {
 // eventually I'd like some way to get a ref to the server in here
 pub struct ApplicationState {
     pub client: ButtplugClient,
-    pub configuration: Configuration,
+    pub configuration: ConfigurationV3,
 }
 
 #[derive(Debug)]
@@ -332,15 +330,36 @@ async fn start_buttplug_server(
                 Some(ApplicationState { configuration, client: _ }) => configuration,
                 None => {
                     println!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
-                    let loaded_configuration = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
+                    let loaded_configuration: Result<ConfigurationMinimal, String> = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
                         .map_err(|e| format!("{:?}", e))
                         .and_then(|string| toml::from_str(&string).map_err(|e| format!("{:?}", e)));
-                    let configuration = match loaded_configuration {
-                        Ok(configuration) => configuration,
+                    let configuration: ConfigurationV3 = match loaded_configuration {
+                        Ok(configuration) => {
+                            let loaded_configuration: Result<ConfigurationV3, String> = if configuration.version < 3 {
+                                println!("converting v{} config to v{}", configuration.version, CONFIG_VERSION);
+                                fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
+                                    .map_err(|e| format!("{:?}", e))
+                                    .and_then(|string| toml::from_str::<ConfigurationV2>(&string).map_err(|e| format!("{:?}", e)))
+                                    .map(|config| config.into())
+                            } else {
+                                fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
+                                    .map_err(|e| format!("{:?}", e))
+                                    .and_then(|string| toml::from_str::<ConfigurationV3>(&string).map_err(|e| format!("{:?}", e)))
+                            };
+
+                            match loaded_configuration {
+                                Ok(configuration) => configuration,
+                                Err(e) => {
+                                    //TODO: attempt to backup old config file when read fails
+                                    eprintln!("falling back to default config due to error: {}", e);
+                                    ConfigurationV3::default()
+                                }
+                            }
+                        }
                         Err(e) => {
                             //TODO: attempt to backup old config file when read fails
                             eprintln!("falling back to default config due to error: {}", e);
-                            Configuration::default()
+                            ConfigurationV3::default()
                         }
                     };
                     println!("{}: Loaded configuration v{} from disk", LOG_PREFIX_BUTTPLUG_SERVER, configuration.version);
@@ -404,7 +423,7 @@ fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=convert::
     warp::any().map(move || db.clone())
 }
 
-pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: Configuration, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<Configuration, String> {
+pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
     let previous_state = lock.deref_mut().take();
@@ -429,7 +448,7 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
     }
 }
 
-async fn save_configuration(configuration: &Configuration) -> Result<(), String> {
+async fn save_configuration(configuration: &ConfigurationV3) -> Result<(), String> {
     // config serialization should never fail, so we should be good to panic
     let serialized_config = toml::to_string(configuration).expect("failed to serialize configuration");
     task::spawn_blocking(|| {
@@ -444,7 +463,7 @@ async fn save_configuration(configuration: &Configuration) -> Result<(), String>
 pub struct ApplicationStatus {
     pub motors: Vec<TaggedMotor>,
     pub devices: Vec<DeviceStatus>,
-    pub configuration: Configuration,
+    pub configuration: ConfigurationV3,
 }
 
 pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Option<ApplicationStatus> {
@@ -481,7 +500,7 @@ pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Op
     }
 }
 
-fn motors_to_tagged(tags: &HashMap<String, Motor>) -> Vec<TaggedMotor> {
+fn motors_to_tagged(tags: &HashMap<String, MotorConfigurationV3>) -> Vec<TaggedMotor> {
     tags.iter()
         .map(|(tag, motor)| TaggedMotor::new(motor.clone(), Some(tag.clone())))
         .collect()
@@ -489,7 +508,7 @@ fn motors_to_tagged(tags: &HashMap<String, Motor>) -> Vec<TaggedMotor> {
 
 /// intermediate struct used to return partially processed device info
 struct DeviceList {
-    motors: Vec<Motor>,
+    motors: Vec<MotorConfigurationV3>,
     devices: Vec<DeviceStatus>,
 }
 
@@ -498,7 +517,6 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
 
     for device in devices.iter() {
-
         let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
             device.battery_level().await.ok()
         } else {
@@ -513,25 +531,27 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
         device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
     }
 
-    let motors = devices.into_iter()
-        .flat_map(|device| {
-            MotorType::iter()
-                .flat_map(move |feature_type| {
-                    let device_name = device.name().clone();
-
-                    let feature_count = device_feature_count_by_type(feature_type, &device);
-                    let feature_range = 0..feature_count;
-                    feature_range.into_iter()
-                        .map(move |feature_index| {
-                            Motor {
-                                device_name: device_name.to_string(),
-                                feature_index,
-                                feature_type: feature_type.clone(),
-                            }
-                        })
-                })
-        })
-        .collect();
+    let motors = Vec::new();
+    //TODO:
+    // let motors = devices.into_iter()
+    //     .flat_map(|device| {
+    //         MotorTypeV3::iter()
+    //             .flat_map(move |feature_type| {
+    //                 let device_name = device.name().clone();
+    //
+    //                 let feature_count = device_feature_count_by_type(feature_type, &device);
+    //                 let feature_range = 0..feature_count;
+    //                 feature_range.into_iter()
+    //                     .map(move |feature_index| {
+    //                         MotorConfigurationV3 {
+    //                             device_name: device_name.to_string(),
+    //                             feature_index,
+    //                             feature_type: feature_type.clone(),
+    //                         }
+    //                     })
+    //             })
+    //     })
+    //     .collect();
 
     DeviceList {
         motors,
@@ -539,7 +559,7 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     }
 }
 
-fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClientDevice) -> u32 {
+fn device_feature_count_by_type(device_type: &MotorTypeV3, device: &ButtplugClientDevice) -> u32 {
     match device_type.get_type() {
         Some(message_type) => {
             //TODO:
@@ -550,16 +570,9 @@ fn device_feature_count_by_type(device_type: &MotorType, device: &ButtplugClient
         }
         None => {
             match device_type {
-                MotorType::Contraction => {
-                    if device.name() == "Lovense Max" && device.message_attributes().message_allowed(&ButtplugDeviceMessageType::RawWriteCmd) {
-                        1
-                    } else {
-                        0
-                    }
-                }
-                MotorType::Linear => panic!("linear type should have already been handled"),
-                MotorType::Rotation => panic!("rotation type should have already been handled"),
-                MotorType::Vibration => panic!("vibration type should have already been handled"),
+                MotorTypeV3::Linear => panic!("linear type should have already been handled"),
+                MotorTypeV3::Rotation => panic!("rotation type should have already been handled"),
+                MotorTypeV3::Scalar(_) => panic!("scalar type should have already been handled"),
             }
         }
     }
@@ -688,14 +701,14 @@ async fn haptic_handler(
             for device in application_state.client.devices() {
                 if let Some(motor_settings) = device_map.remove(device.name()) {
                     let MotorSettings {
-                        speed_map,
+                        scalar_map,
                         rotate_map,
                         linear_map,
                         contraction_hack,
                     } = motor_settings;
 
-                    if !speed_map.is_empty() {
-                        match device.vibrate(&VibrateCommand::SpeedMap(speed_map)).await {
+                    if !scalar_map.is_empty() {
+                        match device.scalar(&ScalarCommand::ScalarMap(scalar_map)).await {
                             Ok(()) => (),
                             Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                         }
@@ -740,7 +753,7 @@ async fn haptic_handler(
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
+fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
     let mut devices: HashMap<String, MotorSettings> = HashMap::new();
 
     for line in command.split_terminator(';') {
@@ -751,8 +764,8 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
         };
         match configuration.motor_from_tag(tag) {
             Some(motor) => {
-                match motor.feature_type {
-                    MotorType::Vibration => {
+                match &motor.feature_type {
+                    MotorTypeV3::Scalar(actuator_type) => {
                         let intensity = match split_line.next() {
                             Some(tag) => tag,
                             None => return Err(format!("could not extract motor intensity from {}", line))
@@ -764,10 +777,10 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
 
                         devices.entry(motor.device_name.clone())
                             .or_insert_with(MotorSettings::default)
-                            .speed_map
-                            .insert(motor.feature_index, intensity);
+                            .scalar_map
+                            .insert(motor.feature_index, (intensity, actuator_type.to_buttplug()));
                     }
-                    MotorType::Linear => {
+                    MotorTypeV3::Linear => {
                         let duration = match split_line.next() {
                             Some(tag) => tag,
                             None => return Err(format!("could not extract motor duration from {}", line))
@@ -791,7 +804,7 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             .linear_map
                             .insert(motor.feature_index, (duration, position));
                     }
-                    MotorType::Rotation => {
+                    MotorTypeV3::Rotation => {
                         let speed = match split_line.next() {
                             Some(tag) => tag,
                             None => return Err(format!("could not extract motor speed from {}", line))
@@ -810,20 +823,6 @@ fn build_vibration_map(configuration: &Configuration, command: &str) -> Result<H
                             .or_insert_with(MotorSettings::default)
                             .rotate_map
                             .insert(motor.feature_index, (speed, direction));
-                    }
-                    MotorType::Contraction => {
-                        let air_level = match split_line.next() {
-                            Some(tag) => tag,
-                            None => return Err(format!("could not extract motor speed from {}", line))
-                        };
-                        let air_level = match air_level.parse::<u8>() {
-                            Ok(b) => b.clamp(0, 3),
-                            Err(e) => return Err(format!("could not parse motor contraction from {}: {:?}", air_level, e))
-                        };
-
-                        devices.entry(motor.device_name.clone())
-                            .or_insert_with(MotorSettings::default)
-                            .contraction_hack = Some(air_level);
                     }
                 }
             }
