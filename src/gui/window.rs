@@ -305,7 +305,7 @@ impl Application for Gui {
                 };
                 let mut save_button = Button::new(&mut state.save_configuration_button, Text::new(save_button_text))
                     .style(STYLE);
-                if state.configuration_dirty {
+                if state.configuration_dirty && !state.saving {
                     save_button = save_button.on_press(Message::SaveConfigurationRequest);
                 }
 
