@@ -25,9 +25,8 @@ This implementation is designed to go on an avatar. The `avatar/user` input shou
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/buttplug-lite/releases/latest).
 2. Run buttplug-lite.exe.
-3. Press the "refresh devices" button to update the UI with all currently connected devices.
-4. Add tags for the devices you plan to use.
-5. Press "apply configuration" to save your settings and apply them to the current server.
+3. Add tags for the devices you plan to use.
+4. Press "apply configuration" to save your settings and apply them to the current server.
 
 ### Sending Commands
 Send text-type messages to `ws://127.0.0.1:3031/haptic`. Binary-type messages are not currently supported. Commands should be sent at most at a 10hz rate. Beyond that application performance may begin to degrade.
