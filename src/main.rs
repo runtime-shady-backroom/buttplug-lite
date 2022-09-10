@@ -601,7 +601,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: device.name().clone(),
-                feature_type: MotorTypeV3::Rotation,
+                feature_type: MotorTypeV3::Linear,
                 feature_index: index as u32,
             };
             motor_configurations.push(motor_config);
