@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 use std::{convert, fs};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::ops::DerefMut;
@@ -21,6 +22,7 @@ use buttplug::server::device::hardware::communication::serialport::SerialPortCom
 use clap::Parser;
 use directories::ProjectDirs;
 use futures::StreamExt;
+use semver::Version;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
@@ -48,6 +50,7 @@ mod device_status;
 mod cli_args;
 mod configuration_v3;
 mod configuration_minimal;
+mod update_checker;
 
 
 pub const CONFIG_VERSION: i32 = 3;
@@ -104,6 +107,43 @@ async fn tokio_main() {
             .finish()
             .init();
     }
+
+    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).expect("Local version didn't follow semver!");
+    let update_url = match update_checker::check_for_update().await {
+        Ok(response) => {
+            println!("Update Url: {:?}", response.html_url);
+            println!("Update Version: {:?}", response.tag_name);
+            match Version::parse(&response.tag_name) {
+                Ok(remote_version) => {
+                    match remote_version.cmp(&local_version) {
+                        Ordering::Greater => {
+                            // we are behind
+                            println!("Local version is outdated.");
+                            Some(response.html_url)
+                        }
+                        Ordering::Less => {
+                            // we are NEWER than remote
+                            println!("Local version is NEWER than remote version!");
+                            None
+                        }
+                        Ordering::Equal => {
+                            // we are up to date
+                            println!("We are up to date.");
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Error parsing remote version: {:?}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to get latest version info: {:?}", e);
+            None
+        }
+    };
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
@@ -248,7 +288,7 @@ async fn tokio_main() {
         let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
         let subscription = ApplicationStatusSubscriptionProvider::new(application_status_receiver);
-        gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices, subscription); // blocking call
+        gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.
@@ -523,7 +563,6 @@ struct DeviceList {
 }
 
 fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
-
     let mut motor_configuration_count: usize = 0;
     for device in devices.iter() {
         motor_configuration_count += device.message_attributes().scalar_cmd().as_ref().map_or(0, |v| v.len());

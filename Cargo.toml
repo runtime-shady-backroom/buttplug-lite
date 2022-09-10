@@ -14,6 +14,7 @@ warp = "^0.3.0" # uses tokio 1
 futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "^6.0.0", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
 serde = "^1.0.0"
+serde_json = "^1.0.0"
 toml = "^0.5.0"
 directories = "^4.0.1"
 iced = "^0.4.2"
@@ -23,3 +24,9 @@ lazy_static = "^1.4.0"
 tracing = "^0.1.0"
 tracing-subscriber = "^0.3.0"
 clap = { version = "^3.0.13", features = ["derive"] }
+hyper = "^0.14.20"
+hyper-timeout = "^0.4.1"
+hyper-tls = "^0.5.0"
+bytes = "^1.0.0"
+open = "^3.0.2"
+semver = "^1.0.13"

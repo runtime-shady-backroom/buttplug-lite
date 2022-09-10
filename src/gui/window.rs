@@ -32,6 +32,7 @@ pub fn run(
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
     initial_devices: ApplicationStatus,
     application_status_subscription: ApplicationStatusSubscriptionProvider,
+    update_url: Option<String>,
 ) {
     let settings = Settings {
         id: Some("buttplug-lite".to_string()),
@@ -41,6 +42,7 @@ pub fn run(
             application_state_db,
             initial_application_status: initial_devices,
             application_status_subscription,
+            update_url,
         },
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
@@ -62,6 +64,7 @@ struct Flags {
     application_state_db: ApplicationStateDb,
     initial_application_status: ApplicationStatus,
     application_status_subscription: ApplicationStatusSubscriptionProvider,
+    update_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +77,7 @@ enum Message {
     MotorMessage(usize, MotorMessage),
     NativeEventOccurred(Event),
     Tick,
+    UpdateButtonPressed,
 }
 
 enum Gui {
@@ -90,6 +94,7 @@ struct State {
     port_text: String,
     port_input: text_input::State,
     save_configuration_button: button::State,
+    update_button: button::State,
     restart_warp_button: button::State,
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
@@ -98,6 +103,7 @@ struct State {
     saving: bool,
     last_configuration: ConfigurationV3,
     application_status_subscription: ApplicationStatusSubscriptionProvider,
+    update_url: Option<String>,
 }
 
 impl Gui {
@@ -114,6 +120,7 @@ impl Gui {
             port_text: port.to_string(),
             port_input: Default::default(),
             save_configuration_button: Default::default(),
+            update_button: Default::default(),
             restart_warp_button: Default::default(),
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
@@ -122,6 +129,7 @@ impl Gui {
             saving: false,
             last_configuration: configuration,
             application_status_subscription: flags.application_status_subscription,
+            update_url: flags.update_url,
         })
     }
 
@@ -170,6 +178,7 @@ impl Application for Gui {
                                     port_text: old_state.port_text,
                                     port_input: old_state.port_input,
                                     save_configuration_button: old_state.save_configuration_button,
+                                    update_button: old_state.update_button,
                                     restart_warp_button: old_state.restart_warp_button,
                                     warp_restart_tx: old_state.warp_restart_tx,
                                     application_state_db: old_state.application_state_db,
@@ -178,6 +187,7 @@ impl Application for Gui {
                                     saving: old_state.saving,
                                     last_configuration: old_state.last_configuration,
                                     application_status_subscription: old_state.application_status_subscription,
+                                    update_url: old_state.update_url,
                                 });
                             } else {
                                 // this should never happen
@@ -242,6 +252,11 @@ impl Application for Gui {
                     Message::Tick => {
                         Command::none()
                     }
+                    Message::UpdateButtonPressed => {
+                        let update_url: &str = state.update_url.as_ref().expect("Somehow pressed the update button without it visible!?").as_str();
+                        open::that(update_url).expect("Failed to open update URL");
+                        Command::none()
+                    }
                 }
             }
         }
@@ -300,10 +315,20 @@ impl Application for Gui {
                     .push(Column::new()
                         .spacing(TABLE_SPACING)
                         .width(Length::Fill)
-                        .push(Row::new()
-                            .spacing(TABLE_SPACING)
-                            .push(save_button)
-                        )
+                        .push({
+                            let row = Row::new()
+                                .spacing(TABLE_SPACING)
+                                .push(save_button);
+                            if state.update_url.is_some() {
+                                row.push(
+                                    Button::new(&mut state.update_button, Text::new("Update Available!"))
+                                        .style(STYLE)
+                                        .on_press(Message::UpdateButtonPressed)
+                                )
+                            } else {
+                                row
+                            }
+                        })
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
                             .align_items(Alignment::Center)
