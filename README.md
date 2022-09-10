@@ -32,37 +32,42 @@ This implementation is designed to go on an avatar. The `avatar/user` input shou
 Send text-type messages to `ws://127.0.0.1:3031/haptic`. Binary-type messages are not currently supported. Commands should be sent at most at a 10hz rate. Beyond that application performance may begin to degrade.
 
 #### Message Format
-The message format is a list of semicolon (`;`) delimited motor commands. There are three possible types of command: Vibration, Linear, and Rotation. All commands start with a motor tag, which is a user-defined string representing a specific motor on a specific device.
+The message format is a list of semicolon (`;`) delimited motor commands. There are three possible types of command: Scalar, Linear, and Rotation. All commands start with a motor tag, which is a user-defined string representing a specific motor on a specific device.
 
-##### Vibration
-`tag:strength`  
-Strength controls vibration intensity and ranges from `0.0` to `1.0`.
+##### Scalar
+`tag:strength`
+
+Strength controls motor intensity and ranges from `0.0` to `1.0`.
 
 ##### Linear
-`tag:duration:position`  
+`tag:duration:position`
+
 Position controls target position and ranges from `0.0` to `1.0`.  
 Duration controls time in milliseconds the device should take to move to the target position. Duration must be a positive integer.
 
 ##### Rotation
-`tag:speed`  
+`tag:speed`
+
 Speed controls the speed of rotation and ranges from `-1.0` to `1.0`. Positive numbers are clockwise, negative numbers are counterclockwise.
 
-##### Contraction
+##### Contraction (Deprecated)
 `tag:level`
-Contraction controls the pump strength on the Lovense Max. It must be an integer between `0` and `3`, inclusive. **Contraction is an unstable feature and may be changed in future versions!**
+
+**Only supported in versions  0.5.3 to 1.1.0**. Starting in version 2, contraction is handled via a scalar command.
+
+Contraction controls the pump strength on the Lovense Max. It must be an integer between `0` and `3`, inclusive.
 
 #### An Example Command
 
-| Tag    | Type        | Strength | Duration | Position | Speed | Contraction |
-|--------|-------------|---------:|---------:|---------:|------:|------------:|
-| foo    | Vibration   |       0% |          |          |       |             |
-| bar    | Vibration   |      30% |          |          |       |             |
-| baz    | Vibration   |     100% |          |          |       |             |
-| gort   | Linear      |          |     20ms |      25% |       |             |
-| klaatu | Linear      |          |    400ms |      75% |       |             |
-| barada | Rotation    |          |          |          | -0.75 |             |
-| nikto  | Rotation    |          |          |          |  0.26 |             |
-| max    | Contraction |          |          |          |       |           3 |
+| Tag    | Type     | Strength | Duration | Position | Speed | Contraction |
+|--------|----------|---------:|---------:|---------:|------:|------------:|
+| foo    | Scalar   |       0% |          |          |       |             |
+| bar    | Scalar   |      30% |          |          |       |             |
+| baz    | Scalar   |     100% |          |          |       |             |
+| gort   | Linear   |          |     20ms |      25% |       |             |
+| klaatu | Linear   |          |    400ms |      75% |       |             |
+| barada | Rotation |          |          |          | -0.75 |             |
+| nikto  | Rotation |          |          |          |  0.26 |             |
 
 
 ```
@@ -89,15 +94,15 @@ Prior to version 0.7.0 this endpoint is a 404.
 ### Checking the Configuration
 Send an HTTP GET to `http://127.0.0.1:3031/deviceconfig`. A 200 OK will be returned with body containing a machine-readable list of configured motors. Example response:
 ```
-o;Lovense Edge;vibration
-c;Lovense Max;contraction
-i;Lovense Edge;vibration
-m;Lovense Max;vibration
+o;Lovense Edge;scalar
+c;Lovense Max;scalar
+i;Lovense Edge;scalar
+m;Lovense Max;scalar
 ```
 
-The response is a newline (LF) delimited list of motor configurations. There is a trailing newline. Each motor configuration line is a semicolon (`;`) delimited list of tag, device name, and device type. In the case where there are no configured motors the response body will be an empty string.
+The response is a newline (LF) delimited list of motor configurations. There is a trailing newline. Each motor configuration line is a semicolon (`;`) delimited list of tag, device name, and motor type. In the case where there are no configured motors the response body will be an empty string.
 
-Possible device types are: `linear`, `rotation`, `vibration`, and `contraction`.
+Possible motors types are: `linear`, `rotation`, and `scalar`.
 
 Prior to version 0.7.0 this endpoint is a 404.
 

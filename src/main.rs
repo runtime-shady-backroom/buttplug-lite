@@ -267,13 +267,21 @@ async fn tokio_main() {
     }
 }
 
-fn create_config_file_path() -> PathBuf {
-    let config_dir_path: PathBuf = ProjectDirs::from("io.github", "runtime-shady-backroom", env!("CARGO_PKG_NAME"))
+fn get_config_dir() -> PathBuf {
+    ProjectDirs::from("io.github", "runtime-shady-backroom", env!("CARGO_PKG_NAME"))
         .expect("unable to locate configuration directory")
         .config_dir()
-        .into();
+        .into()
+}
+
+fn create_config_file_path() -> PathBuf {
+    let config_dir_path: PathBuf = get_config_dir();
     fs::create_dir_all(config_dir_path.as_path()).expect("failed to create configuration directory");
     config_dir_path.join(CONFIG_FILE_NAME)
+}
+
+fn get_backup_config_file_path(version: i32) -> PathBuf {
+    get_config_dir().join(format!("backup_config_v{}.toml", version))
 }
 
 fn create_tokio_runtime() -> tokio::runtime::Runtime {
@@ -336,6 +344,7 @@ async fn start_buttplug_server(
                     let configuration: ConfigurationV3 = match loaded_configuration {
                         Ok(configuration) => {
                             let loaded_configuration: Result<ConfigurationV3, String> = if configuration.version < 3 {
+                                fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
                                 println!("converting v{} config to v{}", configuration.version, CONFIG_VERSION);
                                 fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
                                     .map_err(|e| format!("{:?}", e))
@@ -350,14 +359,15 @@ async fn start_buttplug_server(
                             match loaded_configuration {
                                 Ok(configuration) => configuration,
                                 Err(e) => {
-                                    //TODO: attempt to backup old config file when read fails
+                                    // attempt to backup old config file when read fails
+                                    fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
                                     eprintln!("falling back to default config due to error: {}", e);
                                     ConfigurationV3::default()
                                 }
                             }
                         }
                         Err(e) => {
-                            //TODO: attempt to backup old config file when read fails
+                            fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(0)).expect("failed to back up config");
                             eprintln!("falling back to default config due to error: {}", e);
                             ConfigurationV3::default()
                         }
