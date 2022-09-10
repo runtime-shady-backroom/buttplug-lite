@@ -80,8 +80,8 @@ impl From<ConfigurationV2> for ConfigurationV3 {
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct MotorConfigurationV3 {
     pub device_name: String,
-    pub feature_type: MotorTypeV3,
     pub feature_index: u32,
+    pub feature_type: MotorTypeV3,
 }
 
 impl Display for MotorConfigurationV3 {
@@ -97,16 +97,17 @@ impl TryFrom<MotorConfigurationV2> for MotorConfigurationV3 {
         config_v2.feature_type.try_into().map(|type_v3| MotorConfigurationV3 {
             device_name: config_v2.device_name,
             feature_type: type_v3,
-            feature_index: config_v2.feature_index
+            feature_index: config_v2.feature_index,
         })
     }
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[serde(tag = "type")]
 pub enum MotorTypeV3 {
     Linear,
     Rotation,
-    Scalar(ActuatorType),
+    Scalar { actuator_type: ActuatorType },
 }
 
 impl TryFrom<MotorTypeV2> for MotorTypeV3 {
@@ -174,7 +175,7 @@ impl Display for ActuatorType {
 impl MotorTypeV3 {
     pub fn get_type(&self) -> Option<ButtplugDeviceMessageType> {
         match self {
-            MotorTypeV3::Scalar(_) => Some(ButtplugDeviceMessageType::ScalarCmd),
+            MotorTypeV3::Scalar { actuator_type: _ } => Some(ButtplugDeviceMessageType::ScalarCmd),
             MotorTypeV3::Linear => Some(ButtplugDeviceMessageType::LinearCmd),
             MotorTypeV3::Rotation => Some(ButtplugDeviceMessageType::RotateCmd),
         }
@@ -186,7 +187,7 @@ impl Display for MotorTypeV3 {
         match self {
             MotorTypeV3::Linear => write!(f, "linear"),
             MotorTypeV3::Rotation => write!(f, "rotation"),
-            MotorTypeV3::Scalar(actuator_type) => write!(f, "scalar({})", actuator_type),
+            MotorTypeV3::Scalar { actuator_type } => write!(f, "scalar ({})", actuator_type),
         }
     }
 }

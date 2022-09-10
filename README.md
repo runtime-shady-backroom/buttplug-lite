@@ -5,7 +5,7 @@ This application serves a websocket that runs a dramatically simplified version 
 - Extremely simple fire-and-forget protocol
 - Standalone application requiring no other software
 
-![screenshot of GUI](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/buttplug-lite/images/buttplug-lite-1.1.0.png)
+![screenshot of GUI](https://raw.githubusercontent.com/wiki/runtime-shady-backroom/buttplug-lite/images/buttplug-lite-2.0.0.png)
 
 
 ## Supported Devices
@@ -113,15 +113,15 @@ Example response:
 ```
 device server running=true
   Lovense Edge
-    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
-    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", _actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", _actuator_type: Vibrate, step_count: 20 }
   Lovense Hush
-    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", _actuator_type: Vibrate, step_count: 20 }
   Lovense Max
-    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Vibrator", actuator_type: Vibrate, step_count: 20 }
-    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Air Pump", actuator_type: Constrict, step_count: 5 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Vibrator", _actuator_type: Vibrate, step_count: 20 }
+    ScalarCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "Air Pump", _actuator_type: Constrict, step_count: 5 }
   The Handy
-    LinearCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", actuator_type: Position, step_count: 100 }
+    LinearCmd: ClientGenericDeviceMessageAttributes { feature_descriptor: "No description available for feature", _actuator_type: Position, step_count: 100 }
 ```
 
 ### Checking Battery

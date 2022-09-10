@@ -581,7 +581,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
                 device_name: device.name().clone(),
-                feature_type: MotorTypeV3::Scalar(actuator_type),
+                feature_type: MotorTypeV3::Scalar { actuator_type },
                 feature_index: index as u32,
             };
             motor_configurations.push(motor_config);
@@ -819,7 +819,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
         match configuration.motor_from_tag(tag) {
             Some(motor) => {
                 match &motor.feature_type {
-                    MotorTypeV3::Scalar(actuator_type) => {
+                    MotorTypeV3::Scalar { actuator_type } => {
                         let intensity = match split_line.next() {
                             Some(tag) => tag,
                             None => return Err(format!("could not extract motor intensity from {}", line))
