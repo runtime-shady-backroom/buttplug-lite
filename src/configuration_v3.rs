@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
@@ -66,10 +66,17 @@ impl Default for ConfigurationV3 {
 
 impl From<ConfigurationV2> for ConfigurationV3 {
     fn from(configuration_v2: ConfigurationV2) -> Self {
+        // find any devices that contain a contraction type, because we can't safely port over ANY of their motors
+        let bad_device_names: HashSet<String> = configuration_v2.tags.values()
+            .filter(|value| value.feature_type == MotorTypeV2::Contraction)
+            .map(|value| value.device_name.to_owned())
+            .collect();
+
         ConfigurationV3 {
             version: configuration_v2.version,
             port: configuration_v2.port,
             tags: configuration_v2.tags.into_iter()
+                .filter(|(_key, value)| !bad_device_names.contains(&value.device_name))
                 .filter_map(|(key, value)| value.try_into().ok().map(|value| (key, value)))
                 .collect(),
         }
@@ -117,7 +124,7 @@ impl TryFrom<MotorTypeV2> for MotorTypeV3 {
         match type_v2 {
             MotorTypeV2::Linear => Ok(MotorTypeV3::Linear),
             MotorTypeV2::Rotation => Ok(MotorTypeV3::Rotation),
-            MotorTypeV2::Vibration => Err(()),
+            MotorTypeV2::Vibration => Ok(MotorTypeV3::Scalar{actuator_type: ActuatorType::Vibrate}),
             MotorTypeV2::Contraction => Err(()),
         }
     }

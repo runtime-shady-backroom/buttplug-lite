@@ -22,7 +22,7 @@ pub struct MotorConfigurationV2 {
     pub feature_index: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Eq, PartialEq)]
 pub enum MotorTypeV2 {
     Linear,
     Rotation,
