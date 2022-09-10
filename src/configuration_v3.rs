@@ -1,12 +1,13 @@
-use core::slice::Iter;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
+use buttplug::core::message::ActuatorType as ButtplugActuatorType;
 use buttplug::core::message::ButtplugDeviceMessageType;
 use serde::{Deserialize, Serialize};
+
 use crate::{CONFIG_VERSION, ConfigurationV2};
-use buttplug::core::message::ActuatorType as ButtplugActuatorType;
+use crate::configuration_v2::{MotorConfigurationV2, MotorTypeV2};
 
 const DEFAULT_PORT: u16 = 3031;
 
@@ -65,7 +66,13 @@ impl Default for ConfigurationV3 {
 
 impl From<ConfigurationV2> for ConfigurationV3 {
     fn from(configuration_v2: ConfigurationV2) -> Self {
-        todo!()
+        ConfigurationV3 {
+            version: configuration_v2.version,
+            port: configuration_v2.port,
+            tags: configuration_v2.tags.into_iter()
+                .filter_map(|(key, value)| value.try_into().ok().map(|value| (key, value)))
+                .collect(),
+        }
     }
 }
 
@@ -83,11 +90,36 @@ impl Display for MotorConfigurationV3 {
     }
 }
 
+impl TryFrom<MotorConfigurationV2> for MotorConfigurationV3 {
+    type Error = ();
+
+    fn try_from(config_v2: MotorConfigurationV2) -> Result<Self, Self::Error> {
+        config_v2.feature_type.try_into().map(|type_v3| MotorConfigurationV3 {
+            device_name: config_v2.device_name,
+            feature_type: type_v3,
+            feature_index: config_v2.feature_index
+        })
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum MotorTypeV3 {
     Linear,
     Rotation,
     Scalar(ActuatorType),
+}
+
+impl TryFrom<MotorTypeV2> for MotorTypeV3 {
+    type Error = ();
+
+    fn try_from(type_v2: MotorTypeV2) -> Result<Self, Self::Error> {
+        match type_v2 {
+            MotorTypeV2::Linear => Ok(MotorTypeV3::Linear),
+            MotorTypeV2::Rotation => Ok(MotorTypeV3::Rotation),
+            MotorTypeV2::Vibration => Err(()),
+            MotorTypeV2::Contraction => Err(()),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
@@ -101,17 +133,6 @@ pub enum ActuatorType {
 }
 
 impl ActuatorType {
-    pub fn from_buttplug(at: &ButtplugActuatorType) -> ActuatorType {
-        match at {
-            ButtplugActuatorType::Vibrate => ActuatorType::Vibrate,
-            ButtplugActuatorType::Rotate => ActuatorType::Rotate,
-            ButtplugActuatorType::Oscillate => ActuatorType::Oscillate,
-            ButtplugActuatorType::Constrict => ActuatorType::Constrict,
-            ButtplugActuatorType::Inflate => ActuatorType::Inflate,
-            ButtplugActuatorType::Position => ActuatorType::Position,
-        }
-    }
-
     pub fn to_buttplug(&self) -> ButtplugActuatorType {
         match self {
             ActuatorType::Vibrate => ButtplugActuatorType::Vibrate,
@@ -120,6 +141,19 @@ impl ActuatorType {
             ActuatorType::Constrict => ButtplugActuatorType::Constrict,
             ActuatorType::Inflate => ButtplugActuatorType::Inflate,
             ActuatorType::Position => ButtplugActuatorType::Position,
+        }
+    }
+}
+
+impl From<&ButtplugActuatorType> for ActuatorType {
+    fn from(at: &ButtplugActuatorType) -> Self {
+        match at {
+            ButtplugActuatorType::Vibrate => ActuatorType::Vibrate,
+            ButtplugActuatorType::Rotate => ActuatorType::Rotate,
+            ButtplugActuatorType::Oscillate => ActuatorType::Oscillate,
+            ButtplugActuatorType::Constrict => ActuatorType::Constrict,
+            ButtplugActuatorType::Inflate => ActuatorType::Inflate,
+            ButtplugActuatorType::Position => ActuatorType::Position,
         }
     }
 }

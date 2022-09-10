@@ -10,9 +10,9 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, device::LinearCommand, device::RotateCommand, device::VibrateCommand, ScalarCommand};
+use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent, LinearCommand, RotateCommand, ScalarCommand};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
-use buttplug::core::message::ButtplugDeviceMessageType;
+use buttplug::core::message::{ButtplugDeviceMessageType, ClientGenericDeviceMessageAttributes};
 use buttplug::server::ButtplugServerBuilder;
 use buttplug::server::device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder;
 use buttplug::server::device::hardware::communication::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
@@ -29,15 +29,15 @@ use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
 
-use cli_args::CliArgs;
-use configuration_minimal::ConfigurationMinimal;
-use configuration_v2::ConfigurationV2;
-use configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
-use device_status::DeviceStatus;
-use gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
-use gui::window::TaggedMotor;
-use motor_settings::MotorSettings;
-use watchdog::WatchdogTimeoutDb;
+use crate::cli_args::CliArgs;
+use crate::configuration_minimal::ConfigurationMinimal;
+use crate::configuration_v2::ConfigurationV2;
+use crate::configuration_v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
+use crate::device_status::DeviceStatus;
+use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
+use crate::gui::window::TaggedMotor;
+use crate::motor_settings::MotorSettings;
+use crate::watchdog::WatchdogTimeoutDb;
 
 mod configuration_v2;
 mod watchdog;
@@ -512,6 +512,56 @@ struct DeviceList {
     devices: Vec<DeviceStatus>,
 }
 
+fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
+
+    let mut motor_configuration_count: usize = 0;
+    for device in devices.iter() {
+        motor_configuration_count += device.message_attributes().scalar_cmd().as_ref().map_or(0, |v| v.len());
+        motor_configuration_count += device.message_attributes().rotate_cmd().as_ref().map_or(0, |v| v.len());
+        motor_configuration_count += device.message_attributes().linear_cmd().as_ref().map_or(0, |v| v.len());
+    }
+
+    let mut motor_configurations: Vec<MotorConfigurationV3> = Vec::with_capacity(motor_configuration_count);
+
+    let empty_vec = Vec::new();
+
+    for device in devices.into_iter() {
+        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
+        for index in 0..scalar_cmds.len() {
+            let message_attributes: &ClientGenericDeviceMessageAttributes = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
+            let actuator_type: ActuatorType = message_attributes.actuator_type().into();
+            let motor_config = MotorConfigurationV3 {
+                device_name: device.name().clone(),
+                feature_type: MotorTypeV3::Scalar(actuator_type),
+                feature_index: index as u32,
+            };
+            motor_configurations.push(motor_config);
+        }
+
+        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
+        for index in 0..rotate_cmds.len() {
+            let motor_config = MotorConfigurationV3 {
+                device_name: device.name().clone(),
+                feature_type: MotorTypeV3::Rotation,
+                feature_index: index as u32,
+            };
+            motor_configurations.push(motor_config);
+        }
+
+        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
+        for index in 0..linear_cmds.len() {
+            let motor_config = MotorConfigurationV3 {
+                device_name: device.name().clone(),
+                feature_type: MotorTypeV3::Rotation,
+                feature_index: index as u32,
+            };
+            motor_configurations.push(motor_config);
+        }
+    }
+
+    motor_configurations
+}
+
 async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let devices = application_state.client.devices();
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
@@ -531,50 +581,11 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
         device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
     }
 
-    let motors = Vec::new();
-    //TODO:
-    // let motors = devices.into_iter()
-    //     .flat_map(|device| {
-    //         MotorTypeV3::iter()
-    //             .flat_map(move |feature_type| {
-    //                 let device_name = device.name().clone();
-    //
-    //                 let feature_count = device_feature_count_by_type(feature_type, &device);
-    //                 let feature_range = 0..feature_count;
-    //                 feature_range.into_iter()
-    //                     .map(move |feature_index| {
-    //                         MotorConfigurationV3 {
-    //                             device_name: device_name.to_string(),
-    //                             feature_index,
-    //                             feature_type: feature_type.clone(),
-    //                         }
-    //                     })
-    //             })
-    //     })
-    //     .collect();
+    let motors = motor_configuration_from_devices(devices);
 
     DeviceList {
         motors,
         devices: device_statuses,
-    }
-}
-
-fn device_feature_count_by_type(device_type: &MotorTypeV3, device: &ButtplugClientDevice) -> u32 {
-    match device_type.get_type() {
-        Some(message_type) => {
-            //TODO:
-            // device.allowed_messages.get(&message_type)
-            //     .and_then(|attributes| attributes.feature_count)
-            //     .unwrap_or(0)
-            0
-        }
-        None => {
-            match device_type {
-                MotorTypeV3::Linear => panic!("linear type should have already been handled"),
-                MotorTypeV3::Rotation => panic!("rotation type should have already been handled"),
-                MotorTypeV3::Scalar(_) => panic!("scalar type should have already been handled"),
-            }
-        }
     }
 }
 
@@ -704,7 +715,6 @@ async fn haptic_handler(
                         scalar_map,
                         rotate_map,
                         linear_map,
-                        contraction_hack,
                     } = motor_settings;
 
                     if !scalar_map.is_empty() {
@@ -724,11 +734,6 @@ async fn haptic_handler(
                             Ok(()) => (),
                             Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
                         }
-                    }
-                    if let Some(air_level) = contraction_hack {
-                        todo!()
-                        //let command = format!("Air:Level:{};", air_level);
-                        //device.raw_write(Endpoint::Tx, command.into(), false).await.expect("unable to contract max");
                     }
                 }; // else, ignore this device
             }
