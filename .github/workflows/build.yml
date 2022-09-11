@@ -33,6 +33,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
+          toolchain: stable
           target: ${{ matrix.target.triple }}
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
