@@ -4,6 +4,14 @@ version = "2.0.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 description = "Makes vibrators go brr"
 edition = "2021"
+license = "AGPL 3.0"
+license-file = "LICENSE"
+readme = "README.md"
+homepage = "https://github.com/runtime-shady-backroom/buttplug-lite"
+repository = "https://github.com/runtime-shady-backroom/buttplug-lite"
+documentation = "https://github.com/runtime-shady-backroom/buttplug-lite"
+keywords = ["vibrator", "buttplug", "control", "bluetooth", "websocket"]
+categories = ["hardware-support", "web-programming::http-server", "web-programming::websocket"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
