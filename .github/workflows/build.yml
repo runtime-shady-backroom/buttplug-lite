@@ -35,6 +35,9 @@ jobs:
           profile: minimal
           toolchain: stable
           target: ${{ matrix.target.triple }}
+      - name: Install libdbus
+        if: matrix.target.runs-on == 'ubuntu-latest'
+        run: sudo apt install -y libdbus-1-dev pkg-config
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
       - name: Upload Artifact
