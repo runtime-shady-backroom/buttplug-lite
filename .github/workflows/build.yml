@@ -33,7 +33,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          target: ${{ matrix.target.triple }
+          target: ${{ matrix.target.triple }}
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }
       - name: Upload Artifact
