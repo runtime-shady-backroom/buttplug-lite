@@ -1,0 +1,51 @@
+name: Build
+on: push
+jobs:
+  build:
+    strategy:
+      matrix:
+        target:
+          - runs-on: windows-latest
+            triple: x86_64-pc-windows-msvc
+            name: Windows
+            suffix: .exe
+          - runs-on: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+            name: Linux
+            suffix:
+      fail-fast: false
+    name: Build ${{ matrix.target.name }}
+    runs-on: ${{ matrix.target.runs-on }}
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v3
+      - name: Setup Workflow Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: ${{ matrix.target.triple }
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target.triple }
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: buttplug-lite-${{ matrix.target.triple }}
+          path: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
+          if-no-files-found: error
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          files: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
+          fail_on_unmatched_files: true
