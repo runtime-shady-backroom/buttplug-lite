@@ -2,19 +2,22 @@ name: Build
 on: push
 jobs:
   build:
+    name: Build all targets
     strategy:
       matrix:
         target:
           - runs-on: windows-latest
             triple: x86_64-pc-windows-msvc
-            name: Windows
+            build-name: Windows
+            artifact-name: windows-x64
             suffix: .exe
           - runs-on: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            name: Linux
+            build-name: Linux
+            artifact-name: linux-x64
             suffix:
       fail-fast: false
-    name: Build ${{ matrix.target.name }}
+    name: Build ${{ matrix.target.build-name }}
     runs-on: ${{ matrix.target.runs-on }}
     steps:
       - name: git checkout
@@ -29,31 +32,31 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Setup Rust Toolchain
+      - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           target: ${{ matrix.target.triple }}
-      - name: Install Dependencies
+      - name: Install extra Linux dependencies
         if: matrix.target.runs-on == 'ubuntu-latest'
         run: sudo apt install -y libdbus-1-dev pkg-config libudev-dev # libdbus-sys needs {ibdbus-1-dev, pkg-config}. libudev-sys needs {libudev-dev}
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
-      - name: Upload Workflow Artifact
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v3
         with:
           name: buttplug-lite-${{ matrix.target.triple }}
           path: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
           if-no-files-found: error
-      - name: Rename Artifact for Release # action-gh-release is incapable of renaming files so I have to do it manually\
+      - name: rename artifact for release # action-gh-release is incapable of renaming files, so I have to do it manually
         if: startsWith(github.ref, 'refs/tags/')
-        run: cp "./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}"" "${{ env.RUNNER_TEMP }}/buttplug-lite-${{ matrix.target.triple }}${{ matrix.target.suffix }}"
+        run: cp "./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}"" "${{ env.RUNNER_TEMP }}/buttplug-lite-${{ matrix.target.artifact-name }}${{ matrix.target.suffix }}"
         shell: bash
-      - name: Upload Release Artifact
+      - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           draft: true
-          files: ${{ env.RUNNER_TEMP }}/buttplug-lite-${{ matrix.target.triple }}${{ matrix.target.suffix }}
+          files: ${{ env.RUNNER_TEMP }}/buttplug-lite-${{ matrix.target.artifact-name }}${{ matrix.target.suffix }}
           fail_on_unmatched_files: true
