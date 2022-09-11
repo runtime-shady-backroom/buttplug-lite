@@ -24,7 +24,7 @@ This implementation is designed to go on an avatar. The `avatar/user` input shou
 
 ## Usage
 1. Download the [latest release](https://github.com/runtime-shady-backroom/buttplug-lite/releases/latest).
-2. Run buttplug-lite.exe.
+2. Run buttplug-lite-windows-x64.exe (or your operating system's appropriate binary if you aren't on Windows. Builds are also provided for macOS and Linux)
 3. Add tags for the devices you plan to use.
 4. Press "apply configuration" to save your settings and apply them to the current server.
 

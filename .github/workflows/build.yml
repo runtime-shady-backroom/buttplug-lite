@@ -22,7 +22,7 @@ jobs:
             suffix: ''
           - runs-on: macos-latest
             triple: x86_64-apple-darwin
-            build-name: Mac OS
+            build-name: macOS
             artifact-name: mac-x64
             suffix: ''
       fail-fast: false
