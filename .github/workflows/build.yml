@@ -12,16 +12,16 @@ jobs:
         target:
           - runs-on: windows-latest
             triple: x86_64-pc-windows-msvc
-            build-name: Windows
+            build-display-name: Windows
             artifact-name: windows-x64
             suffix: .exe
           - runs-on: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            build-name: Linux
+            build-display-name: Linux
             artifact-name: linux-x64
             suffix:
       fail-fast: false
-    name: Build ${{ matrix.target.build-name }}
+    name: Build ${{ matrix.target.build-display-name }}
     runs-on: ${{ matrix.target.runs-on }}
     steps:
       - name: git checkout
