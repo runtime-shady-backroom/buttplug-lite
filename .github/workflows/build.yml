@@ -53,7 +53,7 @@ jobs:
           name: buttplug-lite-${{ matrix.target.triple }}
           path: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
           if-no-files-found: error
-      - name: rename artifact for release # action-gh-release is incapable of renaming files, so I have to do it manually
+      - name: Rename artifact for release # action-gh-release is incapable of renaming files, so I have to do it manually
         if: startsWith(github.ref, 'refs/tags/') # only run for pushes to tags
         run: cp "./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}" "${{ env.RUNNER_TEMP }}/buttplug-lite-${{ matrix.target.artifact-name }}${{ matrix.target.suffix }}"
         shell: bash
