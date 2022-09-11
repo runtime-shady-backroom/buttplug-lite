@@ -6,22 +6,21 @@ name: Build
 on: push
 jobs:
   build:
-    name: Build all targets
     strategy:
       matrix:
         target:
           - runs-on: windows-latest
             triple: x86_64-pc-windows-msvc
-            build-display-name: Windows
+            build-name: Windows
             artifact-name: windows-x64
             suffix: .exe
           - runs-on: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            build-display-name: Linux
+            build-name: Linux
             artifact-name: linux-x64
             suffix:
       fail-fast: false
-    name: Build ${{ matrix.target.build-display-name }}
+    name: Build ${{ matrix.target.build-name }}
     runs-on: ${{ matrix.target.runs-on }}
     steps:
       - name: git checkout
