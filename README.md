@@ -133,3 +133,10 @@ Lovense Max:0.45
 
 ## Feedback
 If you have bugs to report or ideas to suggest please let me know by opening an [issue](https://github.com/runtime-shady-backroom/buttplug-lite/issues) or starting a [discussion](https://github.com/runtime-shady-backroom/buttplug-lite/discussions).
+
+
+## License
+
+Copyright 2022 [runtime-shady-backroom](https://github.com/runtime-shady-backroom) and [buttplug-lite contributors](https://github.com/runtime-shady-backroom/buttplug-lite/graphs/contributors).
+
+Buttplug Lite is provided under the [AGPL-3.0 license](LICENSE).
