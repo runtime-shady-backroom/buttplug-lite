@@ -71,7 +71,7 @@ Contraction controls the pump strength on the Lovense Max. It must be an integer
 
 
 ```
-foo:0;bar:0.3;baz:1;gort:20:0.25;klaatu:400:0.75;barada:-0.75;nikto:0.26;max:3
+foo:0;bar:0.3;baz:1;gort:20:0.25;klaatu:400:0.75;barada:-0.75;nikto:0.26
 ```
 
 Note that you are not required to specify all the tagged motors if you don't want to. The following is also valid, but will of course only drive the `foo` motor.
