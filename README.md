@@ -9,7 +9,7 @@ This application serves a websocket that runs a dramatically simplified version 
 
 
 ## Supported Devices
-All [buttplug.io supported devices](https://iostindex.com/?filtersChanged=1&filter0ButtplugSupport=7) should work. This includes everything from Lovense devices to Xbox controllers.
+All [buttplug.io supported devices](https://iostindex.com/?filter0ButtplugSupport=4) should work. This includes everything from Lovense devices to Xbox controllers.
 
 ## Integrations
 ### Neos VR
