@@ -411,7 +411,6 @@ async fn start_buttplug_server(
                             }
                         }
                         Err(e) => {
-                            fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(0)).expect("failed to back up config");
                             eprintln!("falling back to default config due to error: {}", e);
                             ConfigurationV3::default()
                         }
