@@ -15,7 +15,7 @@ categories = ["hardware-support", "web-programming::http-server", "web-programmi
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "^1.21.1", features = ["full"] }
+tokio = { version = "^1.21.2", features = ["full"] }
 tokio-stream = "^0.1.10"
 warp = "^0.3.0" # uses tokio 1
 futures = { version = "^0.3.0", default-features = false }
