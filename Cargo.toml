@@ -30,7 +30,7 @@ iced_futures = "^0.4.1"
 lazy_static = "^1.4.0"
 tracing = "^0.1.0"
 tracing-subscriber = "^0.3.0"
-clap = { version = "^3.2.22", features = ["derive"] }
+clap = { version = "^4.1.1", features = ["derive"] }
 hyper = "^0.14.20"
 hyper-timeout = "^0.4.1"
 hyper-tls = "^0.5.0"
