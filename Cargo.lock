@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "buttplug-lite"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "buttplug",
  "bytes",
