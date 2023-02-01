@@ -278,7 +278,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
- "windows",
+ "windows 0.43.0",
 ]
 
 [[package]]
@@ -299,9 +299,9 @@ checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
 
 [[package]]
 name = "buttplug"
-version = "6.3.0"
+version = "7.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5c2ea5bdfcb439fee273e3cde678c25fd6cd6bb649ccbf6712052cc735a479"
+checksum = "0f9b4e2f6bf8b19dc1c1ec340de487eef70f72c1afd611d065b0dd5101347768"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -342,7 +342,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
- "windows",
+ "windows 0.44.0",
 ]
 
 [[package]]
@@ -375,9 +375,9 @@ dependencies = [
 
 [[package]]
 name = "buttplug_derive"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03aff4c65e86203fa86ae3bed20b7b4c1885c1670c4f99a062e0de1366ac2ed2"
+checksum = "d1d3674d14124c25b9e4e57d98209aeb9f3e42ce719790e772c83d20a9b663a5"
 dependencies = [
  "quote",
  "syn",
@@ -4090,10 +4090,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows"
+version = "0.44.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e745dab35a0c4c77aa3ce42d595e13d2003d6902d6b08c9ef5fc326d08da12b"
+dependencies = [
+ "windows-targets",
+]
+
+[[package]]
 name = "windows-sys"
 version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a3e1820f08b8513f676f7ab6c1f99ff312fb97b553d30ff4dd86f9f15728aa7"
+dependencies = [
+ "windows_aarch64_gnullvm",
+ "windows_aarch64_msvc",
+ "windows_i686_gnu",
+ "windows_i686_msvc",
+ "windows_x86_64_gnu",
+ "windows_x86_64_gnullvm",
+ "windows_x86_64_msvc",
+]
+
+[[package]]
+name = "windows-targets"
+version = "0.42.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e2522491fbfcd58cc84d47aeb2958948c4b8982e9a2d8a2a35bbaed431390e7"
 dependencies = [
  "windows_aarch64_gnullvm",
  "windows_aarch64_msvc",
