@@ -21,7 +21,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-use iced::{button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input, toggler};
+use iced::widget::{button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input, toggler};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
@@ -131,6 +131,7 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
 
 mod light {
     use iced::{button, Color, Vector};
+    use iced::widget::button;
 
     pub struct Button;
 
@@ -157,9 +158,11 @@ mod light {
 
 mod dark {
     use iced::{
-        button, checkbox, container, progress_bar, radio, rule, scrollable,
-        slider, text_input, toggler, Color,
+        button, checkbox, Color, container, progress_bar, radio, rule,
+        scrollable, slider, text_input, toggler,
     };
+    use iced::widget::{button, checkbox, container, radio, scrollable, text_input, toggler};
+    use iced_native::widget::{progress_bar, rule, slider};
 
     const SURFACE: Color = Color::from_rgb(
         0x40 as f32 / 255.0,
