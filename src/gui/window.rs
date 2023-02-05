@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{alignment::Alignment, Application, Command, Element, Length, Rule, Settings, Subscription};
-use iced::widget::{button, Button, Column, Container, Row, scrollable, Scrollable, Text, text_input, TextInput};
-use iced_native::{Event, window};
+use iced::{alignment::Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
+use iced::widget::{Button, Column, Container, Row, Scrollable, Text, TextInput, Rule};
+use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
@@ -17,8 +17,6 @@ use crate::configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3
 use crate::device_status::DeviceStatus;
 use crate::executor::TokioExecutor;
 use crate::gui::subscription::ApplicationStatusSubscriptionProvider;
-
-use super::theme::Theme;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: u16 = 75;
@@ -93,16 +91,10 @@ enum Gui {
 struct State {
     motors: Vec<TaggedMotor>,
     devices: Vec<DeviceStatus>,
-    scroll: scrollable::State,
     port: u16,
     port_text: String,
-    port_input: text_input::State,
-    save_configuration_button: button::State,
-    update_button: button::State,
-    restart_warp_button: button::State,
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
-    should_exit: bool,
     configuration_dirty: bool,
     saving: bool,
     last_configuration: ConfigurationV3,
@@ -119,16 +111,10 @@ impl Gui {
         Gui::Loaded(State {
             devices,
             motors,
-            scroll: Default::default(),
             port,
             port_text: port.to_string(),
-            port_input: Default::default(),
-            save_configuration_button: Default::default(),
-            update_button: Default::default(),
-            restart_warp_button: Default::default(),
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
-            should_exit: false,
             configuration_dirty: ConfigurationV3::is_version_outdated(config_version),
             saving: false,
             last_configuration: configuration,
@@ -149,6 +135,7 @@ impl Gui {
 impl Application for Gui {
     type Executor = TokioExecutor;
     type Message = Message;
+    type Theme = Theme;
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
@@ -177,16 +164,10 @@ impl Application for Gui {
                                 *self = Gui::Loaded(State {
                                     devices: application_status.devices,
                                     motors: application_status.motors,
-                                    scroll: old_state.scroll,
                                     port: old_state.port,
                                     port_text: old_state.port_text,
-                                    port_input: old_state.port_input,
-                                    save_configuration_button: old_state.save_configuration_button,
-                                    update_button: old_state.update_button,
-                                    restart_warp_button: old_state.restart_warp_button,
                                     warp_restart_tx: old_state.warp_restart_tx,
                                     application_state_db: old_state.application_state_db,
-                                    should_exit: old_state.should_exit,
                                     configuration_dirty: old_state.configuration_dirty,
                                     saving: old_state.saving,
                                     last_configuration: old_state.last_configuration,
@@ -247,11 +228,12 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::NativeEventOccurred(event) => {
-                        if let Event::Window(window::Event::CloseRequested) = event {
+                        if let Event::Window(iced_native::window::Event::CloseRequested) = event {
                             println!("received gui shutdown request"); //TODO: actually run shutdown code
-                            state.should_exit = true;
+                            iced::window::close()
+                        } else {
+                            Command::none()
                         }
-                        Command::none()
                     }
                     Message::Tick => {
                         // this should keep battery levels reasonably up to date
@@ -264,25 +246,6 @@ impl Application for Gui {
                     }
                 }
             }
-        }
-    }
-
-    // this is called many times in strange and mysterious ways
-    fn subscription(&self) -> Subscription<Message> {
-        let native_events = iced_native::subscription::events()
-            .map(Message::NativeEventOccurred);
-
-        match self {
-            Gui::Loaded(state) => {
-                let application_events = state.application_status_subscription.subscribe()
-                    .map(|event| match event {
-                        ApplicationStatusEvent::DeviceAdded => Message::RefreshDevices,
-                        ApplicationStatusEvent::DeviceRemoved => Message::RefreshDevices,
-                        ApplicationStatusEvent::Tick(_) => Message::Tick
-                    });
-                Subscription::batch(vec![application_events, native_events])
-            }
-            Gui::Loading => native_events,
         }
     }
 
@@ -308,7 +271,7 @@ impl Application for Gui {
                 } else {
                     "save & apply configuration"
                 };
-                let mut save_button = Button::new(&mut state.save_configuration_button, Text::new(save_button_text))
+                let mut save_button = Button::new(Text::new(save_button_text))
                     .style(STYLE);
                 if state.configuration_dirty && !state.saving {
                     save_button = save_button.on_press(Message::SaveConfigurationRequest);
@@ -326,7 +289,7 @@ impl Application for Gui {
                                 .push(save_button);
                             if state.update_url.is_some() {
                                 row.push(
-                                    Button::new(&mut state.update_button, Text::new("Update Available!"))
+                                    Button::new(Text::new("Update Available!"))
                                         .style(STYLE)
                                         .on_press(Message::UpdateButtonPressed)
                                 )
@@ -339,7 +302,7 @@ impl Application for Gui {
                             .align_items(Alignment::Center)
                             .push(input_label("Server port:"))
                             .push(
-                                TextInput::new(&mut state.port_input, "server port", state.port_text.as_str(), Message::PortUpdated)
+                                TextInput::new("server port", state.port_text.as_str(), Message::PortUpdated)
                                     .style(STYLE)
                                     .width(Length::Units(PORT_INPUT_WIDTH))
                                     .padding(TEXT_INPUT_PADDING)
@@ -374,14 +337,22 @@ impl Application for Gui {
         }
     }
 
-    fn should_exit(&self) -> bool {
+    // this is called many times in strange and mysterious ways
+    fn subscription(&self) -> Subscription<Message> {
+        let native_events = iced_native::subscription::events()
+            .map(Message::NativeEventOccurred);
+
         match self {
-            Gui::Loading => {
-                false
-            }
             Gui::Loaded(state) => {
-                state.should_exit
+                let application_events = state.application_status_subscription.subscribe()
+                    .map(|event| match event {
+                        ApplicationStatusEvent::DeviceAdded => Message::RefreshDevices,
+                        ApplicationStatusEvent::DeviceRemoved => Message::RefreshDevices,
+                        ApplicationStatusEvent::Tick(_) => Message::Tick
+                    });
+                Subscription::batch(vec![application_events, native_events])
             }
+            Gui::Loading => native_events,
         }
     }
 }
@@ -390,7 +361,6 @@ impl Application for Gui {
 #[derive(Clone, Debug)]
 pub struct TaggedMotor {
     pub motor: MotorConfigurationV3,
-    tag_text: text_input::State,
     state: TaggedMotorState,
 }
 
@@ -424,7 +394,6 @@ enum MotorMessage {
 enum TaggedMotorState {
     Tagged {
         tag: String,
-        delete_tag_button: button::State,
     },
     Untagged,
 }
@@ -440,21 +409,19 @@ impl TaggedMotor {
         let state = match tag {
             Some(tag) => TaggedMotorState::Tagged {
                 tag,
-                delete_tag_button: Default::default(),
             },
             None => TaggedMotorState::Untagged,
         };
 
         TaggedMotor {
             motor,
-            tag_text: Default::default(),
             state,
         }
     }
 
     fn tag(&self) -> Option<&str> {
         match &self.state {
-            TaggedMotorState::Tagged { tag, delete_tag_button: _ } => Some(tag),
+            TaggedMotorState::Tagged { tag } => Some(tag),
             TaggedMotorState::Untagged => None
         }
     }
@@ -465,16 +432,7 @@ impl TaggedMotor {
                 if tag.is_empty() {
                     self.state = TaggedMotorState::Untagged;
                 } else {
-                    self.state = match self.state {
-                        TaggedMotorState::Tagged { tag: _, delete_tag_button } => TaggedMotorState::Tagged {
-                            tag,
-                            delete_tag_button,
-                        },
-                        TaggedMotorState::Untagged => TaggedMotorState::Tagged {
-                            tag,
-                            delete_tag_button: Default::default(),
-                        },
-                    };
+                    self.state = TaggedMotorState::Tagged { tag };
                 }
             }
             MotorMessage::TagDeleted => {
@@ -490,22 +448,22 @@ impl TaggedMotor {
             .push(input_label(format!("{}", &self.motor)));
 
         let row = match &mut self.state {
-            TaggedMotorState::Tagged { tag, delete_tag_button } => {
+            TaggedMotorState::Tagged { tag  } => {
                 row.push(
-                    TextInput::new(&mut self.tag_text, "motor tag", tag, MotorMessage::TagUpdated)
+                    TextInput::new("motor tag", tag, MotorMessage::TagUpdated)
                         .style(STYLE)
                         .width(Length::Units(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
                     .push(
-                        Button::new(delete_tag_button, Text::new("x"))
+                        Button::new(Text::new("x"))
                             .style(STYLE)
                             .on_press(MotorMessage::TagDeleted)
                     )
             }
             TaggedMotorState::Untagged => {
                 row.push(
-                    TextInput::new(&mut self.tag_text, "motor tag", "", MotorMessage::TagUpdated)
+                    TextInput::new("motor tag", "", MotorMessage::TagUpdated)
                         .style(STYLE)
                         .width(Length::Units(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
