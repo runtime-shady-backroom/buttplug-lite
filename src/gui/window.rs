@@ -330,6 +330,10 @@ impl Application for Gui {
         }
     }
 
+    fn theme(&self) -> Self::Theme {
+        STYLE
+    }
+
     // this is called many times in strange and mysterious ways
     fn subscription(&self) -> Subscription<Message> {
         let native_events = iced_native::subscription::events()
