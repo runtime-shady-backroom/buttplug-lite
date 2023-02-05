@@ -2,13 +2,14 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
 use iced::{alignment::Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
-use iced::widget::{Button, Column, Container, Row, Scrollable, Text, TextInput, Rule};
+use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -249,14 +250,13 @@ impl Application for Gui {
         }
     }
 
-    fn view(&mut self) -> Element<Message> {
+    fn view(&self) -> Element<Message> {
         match self {
             Gui::Loading => {
                 Container::new(
                     Text::new("Loading…")
                         .size(TEXT_SIZE_MASSIVE)
                 )
-                    .style(STYLE)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center_x()
@@ -271,16 +271,13 @@ impl Application for Gui {
                 } else {
                     "save & apply configuration"
                 };
-                let mut save_button = Button::new(Text::new(save_button_text))
-                    .style(STYLE);
+                let mut save_button = Button::new(Text::new(save_button_text));
                 if state.configuration_dirty && !state.saving {
                     save_button = save_button.on_press(Message::SaveConfigurationRequest);
                 }
 
-                let content = Scrollable::new(&mut state.scroll)
-                    .style(STYLE)
-                    .padding(TABLE_SPACING)
-                    .push(Column::new()
+                let content = Scrollable::new(
+                Column::new()
                         .spacing(TABLE_SPACING)
                         .width(Length::Fill)
                         .push({
@@ -290,7 +287,6 @@ impl Application for Gui {
                             if state.update_url.is_some() {
                                 row.push(
                                     Button::new(Text::new("Update Available!"))
-                                        .style(STYLE)
                                         .on_press(Message::UpdateButtonPressed)
                                 )
                             } else {
@@ -303,19 +299,17 @@ impl Application for Gui {
                             .push(input_label("Server port:"))
                             .push(
                                 TextInput::new("server port", state.port_text.as_str(), Message::PortUpdated)
-                                    .style(STYLE)
                                     .width(Length::Units(PORT_INPUT_WIDTH))
                                     .padding(TEXT_INPUT_PADDING)
                             )
                         )
                         .push(
                             Rule::horizontal(TABLE_SPACING)
-                                .style(STYLE)
                         )
                         .push(Row::new()
                             .spacing(TABLE_SPACING)
                             .push(
-                                render_motor_list(&mut state.motors)
+                                render_motor_list(&state.motors)
                             )
                             .push(
                                 render_device_list(&state.devices)
@@ -323,13 +317,12 @@ impl Application for Gui {
                         )
                         .push(
                             Rule::horizontal(TABLE_SPACING)
-                                .style(STYLE)
                         )
                         .push(Text::new(example_message).size(TEXT_SIZE_SMALL))
                     );
+                //TODO: .padding(TABLE_SPACING)
 
                 Container::new(content)
-                    .style(STYLE)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .into()
@@ -441,30 +434,27 @@ impl TaggedMotor {
         }
     }
 
-    fn view(&mut self) -> Element<MotorMessage> {
+    fn view(&self) -> Element<MotorMessage> {
         let row = Row::new()
             .spacing(EOL_INPUT_SPACING)
             .align_items(Alignment::Center)
             .push(input_label(format!("{}", &self.motor)));
 
-        let row = match &mut self.state {
+        let row = match &self.state {
             TaggedMotorState::Tagged { tag  } => {
                 row.push(
                     TextInput::new("motor tag", tag, MotorMessage::TagUpdated)
-                        .style(STYLE)
                         .width(Length::Units(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
                     .push(
                         Button::new(Text::new("x"))
-                            .style(STYLE)
                             .on_press(MotorMessage::TagDeleted)
                     )
             }
             TaggedMotorState::Untagged => {
                 row.push(
                     TextInput::new("motor tag", "", MotorMessage::TagUpdated)
-                        .style(STYLE)
                         .width(Length::Units(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
@@ -475,14 +465,14 @@ impl TaggedMotor {
     }
 }
 
-fn render_motor_list(motors: &mut Vec<TaggedMotor>) -> Element<Message> {
+fn render_motor_list(motors: &Vec<TaggedMotor>) -> Element<Message> {
     let col = Column::new()
         .spacing(TABLE_SPACING)
         .push(Text::new("Motor Configuration").size(TEXT_SIZE_BIG));
     let col = if motors.is_empty() {
         col.push(Text::new("No motors"))
     } else {
-        motors.iter_mut()
+        motors.iter()
             .enumerate()
             .fold(col, |column, (i, motor)| {
                 column.push(motor.view().map(move |message| Message::MotorMessage(i, message)))
@@ -534,11 +524,10 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
         .join(";")
 }
 
-fn input_label<'a, S: Into<String>, T: 'a>(label: S) -> Element<'a, T> {
+fn input_label<'a, S: Into<Cow<'a, str>>, T: 'a>(label: S) -> Element<'a, T> {
     let text = Text::new(label);
 
     Container::new(text)
         .padding(TEXT_INPUT_PADDING)
-        .style(STYLE)
         .into()
 }
