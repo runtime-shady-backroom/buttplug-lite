@@ -480,7 +480,7 @@ impl TaggedMotor {
                         .padding(TEXT_INPUT_PADDING)
                 )
                     .push(
-                        Button::new(Text::new("x"))
+                        Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
                             .on_press(MotorMessage::TagDeleted)
                     )
             }
