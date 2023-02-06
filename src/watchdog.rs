@@ -35,7 +35,7 @@ pub fn start(watchdog_timeout_db: WatchdogTimeoutDb, buttplug_connector_db: Appl
                 if let Some(buttplug_connector) = buttplug_connector_mutex.as_ref() {
                     match buttplug_connector.client.stop_all_devices().await {
                         Ok(()) => (),
-                        Err(e) => eprintln!("watchdog: error halting devices: {:?}", e)
+                        Err(e) => eprintln!("watchdog: error halting devices: {e:?}")
                     }
                 } // else, do nothing because there is no server connected
             }

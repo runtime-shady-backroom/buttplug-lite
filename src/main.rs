@@ -138,13 +138,13 @@ async fn tokio_main() {
                     }
                 }
                 Err(e) => {
-                    println!("Error parsing remote version: {:?}", e);
+                    println!("Error parsing remote version: {e:?}");
                     None
                 }
             }
         }
         Err(e) => {
-            println!("Failed to get latest version info: {:?}", e);
+            println!("Failed to get latest version info: {e:?}");
             None
         }
     };
@@ -254,7 +254,7 @@ async fn tokio_main() {
 
             let shutdown_message = match server {
                 Ok((address, warp_future)) => {
-                    println!("starting web server on {}", address);
+                    println!("starting web server on {address}");
 
                     // only start the GUI once we've successfully started the web server in the first loop iteration
                     if let Some(sender) = gui_start_oneshot_tx {
@@ -274,7 +274,7 @@ async fn tokio_main() {
                 }
                 Err(e) => {
                     //TODO: what happens if the default port is used? The user needs some way to change it.
-                    eprintln!("Failed to start web server: {:?}", e);
+                    eprintln!("Failed to start web server: {e:?}");
                     ShutdownMessage::Shutdown
                 }
             };
@@ -307,7 +307,7 @@ async fn tokio_main() {
 
     // but first, wait for warp to close
     if let Err(e) = warp_shutdown_complete_rx.await {
-        eprintln!("error shutting down warp: {:?}", e)
+        eprintln!("error shutting down warp: {e:?}")
     }
 }
 
@@ -325,7 +325,7 @@ fn create_config_file_path() -> PathBuf {
 }
 
 fn get_backup_config_file_path(version: i32) -> PathBuf {
-    get_config_dir().join(format!("backup_config_v{}.toml", version))
+    get_config_dir().join(format!("backup_config_v{version}.toml"))
 }
 
 fn create_tokio_runtime() -> tokio::runtime::Runtime {
@@ -369,11 +369,11 @@ async fn start_buttplug_server(
 
     match buttplug_client.connect(connector).await {
         Ok(()) => {
-            println!("{}: Device server started!", LOG_PREFIX_BUTTPLUG_SERVER);
+            println!("{LOG_PREFIX_BUTTPLUG_SERVER}: Device server started!");
             let mut event_stream = buttplug_client.event_stream();
             match buttplug_client.start_scanning().await {
-                Ok(()) => println!("{}: starting device scan", LOG_PREFIX_BUTTPLUG_SERVER),
-                Err(e) => eprintln!("{}: scan failure: {:?}", LOG_PREFIX_BUTTPLUG_SERVER, e)
+                Ok(()) => println!("{LOG_PREFIX_BUTTPLUG_SERVER}: starting device scan"),
+                Err(e) => eprintln!("{LOG_PREFIX_BUTTPLUG_SERVER}: scan failure: {e:?}")
             };
 
             // reuse old config, or load from disk if this is the initial connection
@@ -383,21 +383,21 @@ async fn start_buttplug_server(
                 None => {
                     println!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
                     let loaded_configuration: Result<ConfigurationMinimal, String> = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                        .map_err(|e| format!("{:?}", e))
-                        .and_then(|string| toml::from_str(&string).map_err(|e| format!("{:?}", e)));
+                        .map_err(|e| format!("{e:?}"))
+                        .and_then(|string| toml::from_str(&string).map_err(|e| format!("{e:?}")));
                     let configuration: ConfigurationV3 = match loaded_configuration {
                         Ok(configuration) => {
                             let loaded_configuration: Result<ConfigurationV3, String> = if configuration.version < 3 {
                                 fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
                                 println!("converting v{} config to v{}", configuration.version, CONFIG_VERSION);
                                 fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                                    .map_err(|e| format!("{:?}", e))
-                                    .and_then(|string| toml::from_str::<ConfigurationV2>(&string).map_err(|e| format!("{:?}", e)))
+                                    .map_err(|e| format!("{e:?}"))
+                                    .and_then(|string| toml::from_str::<ConfigurationV2>(&string).map_err(|e| format!("{e:?}")))
                                     .map(|config| config.into())
                             } else {
                                 fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                                    .map_err(|e| format!("{:?}", e))
-                                    .and_then(|string| toml::from_str::<ConfigurationV3>(&string).map_err(|e| format!("{:?}", e)))
+                                    .map_err(|e| format!("{e:?}"))
+                                    .and_then(|string| toml::from_str::<ConfigurationV3>(&string).map_err(|e| format!("{e:?}")))
                             };
 
                             match loaded_configuration {
@@ -405,27 +405,27 @@ async fn start_buttplug_server(
                                 Err(e) => {
                                     // attempt to backup old config file when read fails
                                     fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
-                                    eprintln!("falling back to default config due to error: {}", e);
+                                    eprintln!("falling back to default config due to error: {e}");
                                     ConfigurationV3::default()
                                 }
                             }
                         }
                         Err(e) => {
-                            eprintln!("falling back to default config due to error: {}", e);
+                            eprintln!("falling back to default config due to error: {e}");
                             ConfigurationV3::default()
                         }
                     };
-                    println!("{}: Loaded configuration v{} from disk", LOG_PREFIX_BUTTPLUG_SERVER, configuration.version);
+                    println!("{LOG_PREFIX_BUTTPLUG_SERVER}: Loaded configuration v{} from disk", configuration.version);
 
                     if configuration.is_outdated() {
                         let new_configuration = configuration.new_with_current_version();
                         match save_configuration(&new_configuration).await {
                             Ok(_) => {
-                                println!("{}: Migrated configuration to new directory", LOG_PREFIX_BUTTPLUG_SERVER);
+                                println!("{LOG_PREFIX_BUTTPLUG_SERVER}: Migrated configuration to new directory");
                                 new_configuration
                             }
                             Err(e) => {
-                                eprintln!("{}: Error migrating configuration to new directory: {}", LOG_PREFIX_BUTTPLUG_SERVER, e);
+                                eprintln!("{LOG_PREFIX_BUTTPLUG_SERVER}: Error migrating configuration to new directory: {e}");
                                 configuration
                             }
                         }
@@ -446,29 +446,29 @@ async fn start_buttplug_server(
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => {
-                            println!("{}: device connected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name());
+                            println!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}", dev.name());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
                         }
                         ButtplugClientEvent::DeviceRemoved(dev) => {
-                            println!("{}: device disconnected: {}", LOG_PREFIX_BUTTPLUG_SERVER, dev.name());
+                            println!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}", dev.name());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
                         }
-                        ButtplugClientEvent::PingTimeout => println!("{}: ping timeout", LOG_PREFIX_BUTTPLUG_SERVER),
-                        ButtplugClientEvent::Error(e) => println!("{}: server error: {:?}", LOG_PREFIX_BUTTPLUG_SERVER, e),
-                        ButtplugClientEvent::ScanningFinished => println!("{}: device scan finished", LOG_PREFIX_BUTTPLUG_SERVER),
-                        ButtplugClientEvent::ServerConnect => println!("{}: server connected", LOG_PREFIX_BUTTPLUG_SERVER),
+                        ButtplugClientEvent::PingTimeout => println!("{LOG_PREFIX_BUTTPLUG_SERVER}: ping timeout"),
+                        ButtplugClientEvent::Error(e) => println!("{LOG_PREFIX_BUTTPLUG_SERVER}: server error: {e:?}"),
+                        ButtplugClientEvent::ScanningFinished => println!("{LOG_PREFIX_BUTTPLUG_SERVER}: device scan finished"),
+                        ButtplugClientEvent::ServerConnect => println!("{LOG_PREFIX_BUTTPLUG_SERVER}: server connected"),
                         ButtplugClientEvent::ServerDisconnect => {
-                            println!("{}: server disconnected", LOG_PREFIX_BUTTPLUG_SERVER);
+                            println!("{LOG_PREFIX_BUTTPLUG_SERVER}: server disconnected");
                             let mut application_state_mutex = application_state_db.write().await;
                             *application_state_mutex = None; // not strictly required but will give more sane error messages
                             break;
                         }
                     },
-                    None => eprintln!("{}: error reading haptic event", LOG_PREFIX_BUTTPLUG_SERVER)
+                    None => eprintln!("{LOG_PREFIX_BUTTPLUG_SERVER}: error reading haptic event")
                 };
             }
         }
-        Err(e) => eprintln!("{}: failed to connect to server. Will retry shortly... ({:?})", LOG_PREFIX_BUTTPLUG_SERVER, e) // will try to reconnect later, may not need to log this error
+        Err(e) => eprintln!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly... ({e:?})") // will try to reconnect later, may not need to log this error
     }
 }
 
@@ -492,7 +492,7 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
             // restart warp if necessary
             if new_port != previous_configuration.port {
                 warp_shutdown_tx.send(ShutdownMessage::Restart)
-                    .map_err(|e| format!("{:?}", e))?;
+                    .map_err(|e| format!("{e:?}"))?;
             }
 
             Ok(configuration)
@@ -505,9 +505,9 @@ async fn save_configuration(configuration: &ConfigurationV3) -> Result<(), Strin
     // config serialization should never fail, so we should be good to panic
     let serialized_config = toml::to_string(configuration).expect("failed to serialize configuration");
     task::spawn_blocking(|| {
-        fs::write(CONFIG_DIR_FILE_PATH.as_path(), serialized_config).map_err(|e| format!("{:?}", e))
+        fs::write(CONFIG_DIR_FILE_PATH.as_path(), serialized_config).map_err(|e| format!("{e:?}"))
     }).await
-        .map_err(|e| format!("{:?}", e))
+        .map_err(|e| format!("{e:?}"))
         .and_then(convert::identity)
 }
 
@@ -647,11 +647,11 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
     match application_state_mutex.as_ref() {
         Some(application_state) => {
             let connected = application_state.client.connected();
-            let mut string = format!("device server running={}", connected);
+            let mut string = format!("device server running={connected}");
             for device in application_state.client.devices() {
                 string.push_str(format!("\n  {}", device.name()).as_str());
                 if let Some(display_name) = device.display_name() {
-                    string.push_str(format!(" [{}]", display_name).as_str());
+                    string.push_str(format!(" [{display_name}]").as_str());
                 }
 
                 let scalar_cmds = device.message_attributes().scalar_cmd().iter()
@@ -669,7 +669,7 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
                 let attributes = scalar_cmds.chain(rotate_cmds).chain(linear_cmds);
 
                 for (message_type, attributes) in attributes {
-                    string.push_str(format!("\n    {:?}: {:?}", message_type, attributes).as_str());
+                    string.push_str(format!("\n    {message_type:?}: {attributes:?}").as_str());
                 }
             }
             Ok(string)
@@ -719,13 +719,13 @@ async fn haptic_handler(
     application_state_db: ApplicationStateDb,
     watchdog_time: WatchdogTimeoutDb,
 ) {
-    println!("{}: client connected", LOG_PREFIX_HAPTIC_ENDPOINT);
+    println!("{LOG_PREFIX_HAPTIC_ENDPOINT}: client connected");
     let (_, mut rx) = websocket.split();
     while let Some(result) = rx.next().await {
         let message = match result {
             Ok(message) => message,
             Err(e) => {
-                eprintln!("{}: message read error: {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e);
+                eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: message read error: {e:?}");
                 break;
             }
         };
@@ -733,9 +733,9 @@ async fn haptic_handler(
             Ok(str) => str, // should only succeed for Text() type messages
             Err(_) => {
                 if message.is_binary() {
-                    eprintln!("{}: received unexpected binary message: {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, message);
+                    eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: received unexpected binary message: {message:?}");
                 } else if message.is_close() {
-                    println!("{}: client closed connection", LOG_PREFIX_HAPTIC_ENDPOINT);
+                    println!("{LOG_PREFIX_HAPTIC_ENDPOINT}: client closed connection");
                     return; // stop reading input from the client if they close the connection
                 } else if message.is_ping() || message.is_pong() {
                     // do nothing, as there is no need to log ping or pong messages
@@ -745,7 +745,7 @@ async fn haptic_handler(
                      * is private so making this check exhaustive is not enforced by the compiler.
                      * In theory the application state should still be fine here, so I don't panic
                      */
-                    eprintln!("{}: received unhandled message type: {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, message);
+                    eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: received unhandled message type: {message:?}");
                 }
 
                 continue;
@@ -759,7 +759,7 @@ async fn haptic_handler(
             let mut device_map = match device_map {
                 Ok(map) => map,
                 Err(e) => {
-                    eprintln!("{}: error parsing command: {}", LOG_PREFIX_HAPTIC_ENDPOINT, e);
+                    eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error parsing command: {e}");
                     continue;
                 }
             };
@@ -775,19 +775,19 @@ async fn haptic_handler(
                     if !scalar_map.is_empty() {
                         match device.scalar(&ScalarCommand::ScalarMap(scalar_map)).await {
                             Ok(()) => (),
-                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                            Err(e) => eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}",)
                         }
                     }
                     if !rotate_map.is_empty() {
                         match device.rotate(&RotateCommand::RotateMap(rotate_map)).await {
                             Ok(()) => (),
-                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                            Err(e) => eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}")
                         }
                     }
                     if !linear_map.is_empty() {
                         match device.linear(&LinearCommand::LinearMap(linear_map)).await {
                             Ok(()) => (),
-                            Err(e) => eprintln!("{}: error sending command {:?}", LOG_PREFIX_HAPTIC_ENDPOINT, e)
+                            Err(e) => eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}")
                         }
                     }
                 }; // else, ignore this device
@@ -796,7 +796,7 @@ async fn haptic_handler(
             watchdog::feed(&watchdog_time).await;
         } // else, no server connected, so send no commands
     }
-    println!("{}: client connection lost", LOG_PREFIX_HAPTIC_ENDPOINT);
+    println!("{LOG_PREFIX_HAPTIC_ENDPOINT}: client connection lost");
 }
 
 /* convert a command into a tree structure more usable by the Buttplug api
@@ -820,7 +820,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
         let mut split_line = line.split(':');
         let tag = match split_line.next() {
             Some(tag) => tag,
-            None => return Err(format!("could not extract motor tag from {}", line))
+            None => return Err(format!("could not extract motor tag from {line}"))
         };
         match configuration.motor_from_tag(tag) {
             Some(motor) => {
@@ -828,11 +828,11 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                     MotorTypeV3::Scalar { actuator_type } => {
                         let intensity = match split_line.next() {
                             Some(tag) => tag,
-                            None => return Err(format!("could not extract motor intensity from {}", line))
+                            None => return Err(format!("could not extract motor intensity from {line}"))
                         };
                         let intensity = match intensity.parse::<f64>() {
                             Ok(f) => f.filter_nan().clamp(0.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor intensity from {}: {:?}", intensity, e))
+                            Err(e) => return Err(format!("could not parse motor intensity from {intensity}: {e:?}"))
                         };
 
                         devices.entry(motor.device_name.clone())
@@ -843,20 +843,20 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                     MotorTypeV3::Linear => {
                         let duration = match split_line.next() {
                             Some(tag) => tag,
-                            None => return Err(format!("could not extract motor duration from {}", line))
+                            None => return Err(format!("could not extract motor duration from {line}"))
                         };
                         let duration = match duration.parse::<u32>() {
                             Ok(u) => u,
-                            Err(e) => return Err(format!("could not parse motor duration from {}: {:?}", duration, e))
+                            Err(e) => return Err(format!("could not parse motor duration from {duration}: {e:?}"))
                         };
 
                         let position = match split_line.next() {
                             Some(tag) => tag,
-                            None => return Err(format!("could not extract motor position from {}", line))
+                            None => return Err(format!("could not extract motor position from {line}"))
                         };
                         let position = match position.parse::<f64>() {
                             Ok(f) => f.filter_nan().clamp(0.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor position from {}: {:?}", position, e))
+                            Err(e) => return Err(format!("could not parse motor position from {position}: {e:?}"))
                         };
 
                         devices.entry(motor.device_name.clone())
@@ -867,11 +867,11 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                     MotorTypeV3::Rotation => {
                         let speed = match split_line.next() {
                             Some(tag) => tag,
-                            None => return Err(format!("could not extract motor speed from {}", line))
+                            None => return Err(format!("could not extract motor speed from {line}"))
                         };
                         let mut speed = match speed.parse::<f64>() {
                             Ok(f) => f.filter_nan().clamp(-1.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor speed from {}: {:?}", speed, e))
+                            Err(e) => return Err(format!("could not parse motor speed from {speed}: {e:?}"))
                         };
 
                         let direction = speed >= 0.0;
@@ -886,7 +886,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                     }
                 }
             }
-            None => eprintln!("{}: ignoring unknown motor tag {}", LOG_PREFIX_HAPTIC_ENDPOINT, tag)
+            None => eprintln!("{LOG_PREFIX_HAPTIC_ENDPOINT}: ignoring unknown motor tag {tag}")
         };
     };
 

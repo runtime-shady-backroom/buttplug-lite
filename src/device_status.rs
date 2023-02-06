@@ -22,7 +22,7 @@ impl Display for DeviceStatus {
             String::new()
         };
         let rssi = if let Some(rssi) = self.rssi_level {
-            format!("rssi={}", rssi)
+            format!("rssi={rssi}")
         } else {
             String::new()
         };

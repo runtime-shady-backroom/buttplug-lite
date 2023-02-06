@@ -86,7 +86,7 @@ pub fn run(
     Gui::run(settings).expect("could not instantiate window");
     match warp_shutdown_tx.send(ShutdownMessage::Shutdown) {
         Ok(()) => println!("shutdown triggered by UI close"),
-        Err(e) => panic!("Error triggering shutdown: {}", e)
+        Err(e) => panic!("Error triggering shutdown: {e}")
     };
 }
 
@@ -236,7 +236,7 @@ impl Application for Gui {
                                 self.on_configuration_changed();
                             }
                             Err(e) => {
-                                println!("save failed: {:?}", e);
+                                println!("save failed: {e:?}");
                             }
                         }
                         Command::none()
@@ -522,7 +522,7 @@ fn render_device_list(devices: &[DeviceStatus]) -> Element<Message> {
     } else {
         devices.iter()
             .fold(col, |column, device| {
-                column.push(input_label(format!("{}", device)))
+                column.push(input_label(format!("{device}")))
             })
     };
     col.into()
@@ -547,9 +547,9 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
     motors.iter()
         .flat_map(|motor| {
             motor.tag().map(|tag| match motor.motor.feature_type {
-                MotorTypeV3::Linear => format!("{}:20:0.5", tag),
-                MotorTypeV3::Rotation => format!("{}:-0.5", tag),
-                MotorTypeV3::Scalar { actuator_type: _ } => format!("{}:0.5", tag),
+                MotorTypeV3::Linear => format!("{tag}:20:0.5"),
+                MotorTypeV3::Rotation => format!("{tag}:-0.5"),
+                MotorTypeV3::Scalar { actuator_type: _ } => format!("{tag}:0.5"),
             })
         })
         .collect::<Vec<_>>()
