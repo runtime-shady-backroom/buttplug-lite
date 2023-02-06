@@ -8,7 +8,8 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{alignment::Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
+use iced::{alignment::Alignment, Application, Color, Command, Element, Length, Settings, Subscription, Theme};
+use iced::theme::Palette;
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
@@ -28,7 +29,34 @@ const TEXT_SIZE_SMALL: u16 = 12;
 const TEXT_SIZE_DEFAULT: u16 = 20;
 const TEXT_SIZE_BIG: u16 = 30;
 const TEXT_SIZE_MASSIVE: u16 = 50;
-const STYLE: Theme = Theme::Dark;
+
+const DARK_PALETTE: Palette = Palette {
+    background: Color::from_rgb(
+        0x36 as f32 / 255.0,
+        0x39 as f32 / 255.0,
+        0x3F as f32 / 255.0,
+    ),
+    text: Color::from_rgb(1.0, 1.0, 1.0),
+    primary: Color::from_rgb(
+        0x72 as f32 / 255.0,
+        0x89 as f32 / 255.0,
+        0xDA as f32 / 255.0,
+    ),
+    success: Color::from_rgb(
+        0x12 as f32 / 255.0,
+        0x66 as f32 / 255.0,
+        0x4F as f32 / 255.0,
+    ),
+    danger: Color::from_rgb(
+        0xC3 as f32 / 255.0,
+        0x42 as f32 / 255.0,
+        0x3F as f32 / 255.0,
+    ),
+};
+
+lazy_static! {
+    static ref THEME: Theme = Theme::custom(DARK_PALETTE);
+}
 
 pub fn run(
     application_state_db: ApplicationStateDb,
@@ -279,6 +307,7 @@ impl Application for Gui {
                 let content = Scrollable::new(
                 Column::new()
                         .spacing(TABLE_SPACING)
+                        .padding(TABLE_SPACING)
                         .width(Length::Fill)
                         .push({
                             let row = Row::new()
@@ -320,7 +349,6 @@ impl Application for Gui {
                         )
                         .push(Text::new(example_message).size(TEXT_SIZE_SMALL))
                     );
-                //TODO: .padding(TABLE_SPACING)
 
                 Container::new(content)
                     .width(Length::Fill)
@@ -331,7 +359,7 @@ impl Application for Gui {
     }
 
     fn theme(&self) -> Self::Theme {
-        STYLE
+        THEME.clone()
     }
 
     // this is called many times in strange and mysterious ways
