@@ -22,7 +22,7 @@ futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "^6.0.0", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
 serde = "^1.0.0"
 serde_json = "^1.0.0"
-toml = "^0.5.0"
+toml = "^0.7.1"
 directories = "^4.0.1"
 iced = "^0.4.2"
 iced_native = "^0.5.1"
