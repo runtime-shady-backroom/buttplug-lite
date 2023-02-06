@@ -142,6 +142,7 @@ pub enum ActuatorType {
     Constrict,
     Inflate,
     Position,
+    Unknown,
 }
 
 impl ActuatorType {
@@ -153,6 +154,7 @@ impl ActuatorType {
             ActuatorType::Constrict => ButtplugActuatorType::Constrict,
             ActuatorType::Inflate => ButtplugActuatorType::Inflate,
             ActuatorType::Position => ButtplugActuatorType::Position,
+            ActuatorType::Unknown => ButtplugActuatorType::Unknown,
         }
     }
 }
@@ -166,6 +168,7 @@ impl From<&ButtplugActuatorType> for ActuatorType {
             ButtplugActuatorType::Constrict => ActuatorType::Constrict,
             ButtplugActuatorType::Inflate => ActuatorType::Inflate,
             ButtplugActuatorType::Position => ActuatorType::Position,
+            ButtplugActuatorType::Unknown => ActuatorType::Unknown,
         }
     }
 }
@@ -179,6 +182,7 @@ impl Display for ActuatorType {
             ActuatorType::Constrict => write!(f, "constrict"),
             ActuatorType::Inflate => write!(f, "inflate"),
             ActuatorType::Position => write!(f, "position"),
+            ActuatorType::Unknown => write!(f, "unknown"),
         }
     }
 }
@@ -198,7 +202,7 @@ impl Display for MotorTypeV3 {
         match self {
             MotorTypeV3::Linear => write!(f, "linear"),
             MotorTypeV3::Rotation => write!(f, "rotation"),
-            MotorTypeV3::Scalar { actuator_type } => write!(f, "scalar ({})", actuator_type),
+            MotorTypeV3::Scalar { actuator_type } => write!(f, "scalar ({actuator_type})"),
         }
     }
 }
