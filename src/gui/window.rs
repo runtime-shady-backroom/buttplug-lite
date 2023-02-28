@@ -21,12 +21,12 @@ use crate::executor::TokioExecutor;
 use crate::gui::subscription::ApplicationStatusSubscriptionProvider;
 
 const TEXT_INPUT_PADDING: u16 = 5;
-const PORT_INPUT_WIDTH: u16 = 75;
-const TAG_INPUT_WIDTH: u16 = 100;
+const PORT_INPUT_WIDTH: f32 = 75.0;
+const TAG_INPUT_WIDTH: f32 = 100.0;
 const TABLE_SPACING: u16 = 20;
 const EOL_INPUT_SPACING: u16 = 5;
 const TEXT_SIZE_SMALL: u16 = 12;
-const TEXT_SIZE_DEFAULT: u16 = 20;
+const TEXT_SIZE_DEFAULT: f32 = 20.0;
 const TEXT_SIZE_BIG: u16 = 30;
 const TEXT_SIZE_MASSIVE: u16 = 50;
 
@@ -328,7 +328,7 @@ impl Application for Gui {
                             .push(input_label("Server port:"))
                             .push(
                                 TextInput::new("server port", state.port_text.as_str(), Message::PortUpdated)
-                                    .width(Length::Units(PORT_INPUT_WIDTH))
+                                    .width(Length::Fixed(PORT_INPUT_WIDTH))
                                     .padding(TEXT_INPUT_PADDING)
                             )
                         )
@@ -476,7 +476,7 @@ impl TaggedMotor {
             TaggedMotorState::Tagged { tag  } => {
                 row.push(
                     TextInput::new("motor tag", tag, MotorMessage::TagUpdated)
-                        .width(Length::Units(TAG_INPUT_WIDTH))
+                        .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
                     .push(
@@ -487,7 +487,7 @@ impl TaggedMotor {
             TaggedMotorState::Untagged => {
                 row.push(
                     TextInput::new("motor tag", "", MotorMessage::TagUpdated)
-                        .width(Length::Units(TAG_INPUT_WIDTH))
+                        .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
             }
