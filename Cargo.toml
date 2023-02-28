@@ -15,25 +15,25 @@ categories = ["hardware-support", "web-programming::http-server", "web-programmi
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "^1.23.1", features = ["full"] }
-tokio-stream = "^0.1.10"
-warp = "^0.3.3" # uses tokio 1
-futures = { version = "^0.3.0", default-features = false }
 buttplug = { version = "^7.0.1", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
-serde = "^1.0.0"
-serde_json = "^1.0.0"
-toml = "^0.7.1"
-directories = "^4.0.1"
-iced = "^0.7.0"
-iced_native = "^0.8.0"
-iced_futures = "^0.5.1"
-lazy_static = "^1.4.0"
-tracing = "^0.1.0"
-tracing-subscriber = "^0.3.0"
+bytes = "^1.0.0"
 clap = { version = "^4.1.4", features = ["derive"] }
+directories = "^4.0.1"
+futures = { version = "^0.3.0", default-features = false }
 hyper = "^0.14.20"
 hyper-timeout = "^0.4.1"
 hyper-tls = "^0.5.0"
-bytes = "^1.0.0"
+iced = "^0.7.0"
+iced_futures = "^0.5.1"
+iced_native = "^0.8.0"
+lazy_static = "^1.4.0"
 open = "^3.0.3"
 semver = "^1.0.14"
+serde = "^1.0.0"
+serde_json = "^1.0.0"
+tokio = { version = "^1.23.1", features = ["full"] }
+tokio-stream = "^0.1.10"
+toml = "^0.7.1"
+tracing = "^0.1.0"
+tracing-subscriber = "^0.3.0"
+warp = "^0.3.3" # uses tokio 1
