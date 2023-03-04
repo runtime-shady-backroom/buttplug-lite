@@ -34,7 +34,7 @@ use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
@@ -863,7 +863,7 @@ async fn haptic_handler(
             let mut device_map = match device_map {
                 Ok(map) => map,
                 Err(e) => {
-                    warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error parsing command: {e}");
+                    debug!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error parsing command: {e}");
                     continue;
                 }
             };
@@ -990,7 +990,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                     }
                 }
             }
-            None => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: ignoring unknown motor tag {tag}")
+            None => debug!("{LOG_PREFIX_HAPTIC_ENDPOINT}: ignoring unknown motor tag {tag}")
         };
     };
 
