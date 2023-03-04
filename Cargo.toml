@@ -1,6 +1,6 @@
 [package]
 name = "buttplug-lite"
-version = "2.1.0"
+version = "2.1.1"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 description = "Makes vibrators go brr"
 edition = "2021"
@@ -12,12 +12,14 @@ documentation = "https://github.com/runtime-shady-backroom/buttplug-lite"
 keywords = ["vibrator", "buttplug", "control", "bluetooth", "websocket"]
 categories = ["hardware-support", "web-programming::http-server", "web-programming::websocket"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+lto = "thin"
 
 [dependencies]
 buttplug = { version = "^7.0.1", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
 bytes = "^1.0.0"
 clap = { version = "^4.1.4", features = ["derive"] }
+chrono = "^0.4.23"
 directories = "^4.0.1"
 futures = { version = "^0.3.0", default-features = false }
 hyper = "^0.14.20"
@@ -35,5 +37,6 @@ tokio = { version = "^1.23.1", features = ["full"] }
 tokio-stream = "^0.1.10"
 toml = "^0.7.1"
 tracing = "^0.1.0"
-tracing-subscriber = "^0.3.0"
+tracing-appender = "^0.2"
+tracing-subscriber = { version = "^0.3.16", features = ["env-filter"] }
 warp = "^0.3.3" # uses tokio 1

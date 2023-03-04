@@ -13,6 +13,7 @@ use iced::theme::Palette;
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::{info, instrument, warn};
 
 use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
 use crate::configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
@@ -58,6 +59,8 @@ lazy_static! {
     static ref THEME: Theme = Theme::custom(DARK_PALETTE);
 }
 
+
+#[instrument(skip_all)]
 pub fn run(
     application_state_db: ApplicationStateDb,
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
@@ -85,7 +88,7 @@ pub fn run(
 
     Gui::run(settings).expect("could not instantiate window");
     match warp_shutdown_tx.send(ShutdownMessage::Shutdown) {
-        Ok(()) => println!("shutdown triggered by UI close"),
+        Ok(()) => info!("shutdown triggered by UI close"),
         Err(e) => panic!("Error triggering shutdown: {e}")
     };
 }
@@ -175,6 +178,7 @@ impl Application for Gui {
         format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 
+    #[instrument(skip_all)]
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match self {
             Gui::Loading => {
@@ -183,7 +187,7 @@ impl Application for Gui {
             Gui::Loaded(state) => {
                 match message {
                     Message::RefreshDevices => {
-                        println!("device refresh triggered");
+                        info!("device refresh triggered");
                         Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::RefreshDevicesComplete(application_status) => {
@@ -218,7 +222,7 @@ impl Application for Gui {
                             // this should not be possible
                             panic!("save pressed but we're already saving!");
                         } else {
-                            println!("save pressed");
+                            info!("save initiated");
                             state.saving = true;
 
                             state.port_text = state.port.to_string();
@@ -236,7 +240,7 @@ impl Application for Gui {
                                 self.on_configuration_changed();
                             }
                             Err(e) => {
-                                println!("save failed: {e:?}");
+                                warn!("save failed: {e:?}");
                             }
                         }
                         Command::none()
@@ -251,14 +255,14 @@ impl Application for Gui {
                     Message::MotorMessage(i, motor_message) => {
                         match state.motors.get_mut(i) {
                             Some(motor) => motor.update(motor_message),
-                            None => eprintln!("motor index out of bounds"),
+                            None => warn!("motor index out of bounds"),
                         }
                         self.on_configuration_changed();
                         Command::none()
                     }
                     Message::NativeEventOccurred(event) => {
                         if let Event::Window(iced_native::window::Event::CloseRequested) = event {
-                            println!("received gui shutdown request"); //TODO: actually run shutdown code
+                            info!("received gui shutdown request"); //TODO: actually run shutdown code
                             iced::window::close()
                         } else {
                             Command::none()

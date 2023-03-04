@@ -5,9 +5,17 @@
 use clap::Parser;
 
 #[derive(Parser)]
-#[clap(author = "runtime", version, about, long_about = None)]
+#[command(author = "runtime", version, about, long_about = None)]
 pub struct CliArgs {
-    /// Sets the level of verbosity
-    #[clap(short, long, action = clap::ArgAction::Count)]
+    /// Sets the level of verbosity.
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
     pub verbose: u8,
+
+    /// Log to stdout instead of a log file
+    #[arg(short = 'c', long)]
+    pub stdout: bool,
+
+    /// Custom logging filter: https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/filter/struct.EnvFilter.html. This overrides `--verbose` setting.
+    #[arg(short = 'f', long)]
+    pub log_filter: Option<String>,
 }
