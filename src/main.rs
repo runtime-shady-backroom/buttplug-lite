@@ -532,11 +532,11 @@ async fn start_buttplug_server(
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}", dev.name());
+                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {} #{}", dev.name(), dev.index());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
                         }
                         ButtplugClientEvent::DeviceRemoved(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}", dev.name());
+                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {} #{}", dev.name(), dev.index());
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
                         }
                         ButtplugClientEvent::PingTimeout => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: ping timeout"),
@@ -651,6 +651,13 @@ struct DeviceList {
     devices: Vec<DeviceStatus>,
 }
 
+#[inline(always)]
+fn name_from_device(device: &ButtplugClientDevice) -> String {
+    device.name().clone()
+    // once we want to handle duplicate devices:
+    //format!("{}#{}", device.name(), device.index())
+}
+
 fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
     let mut motor_configuration_count: usize = 0;
     for device in devices.iter() {
@@ -669,7 +676,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
             let message_attributes: &ClientGenericDeviceMessageAttributes = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
-                device_name: device.name().clone(),
+                device_name: name_from_device(&device),
                 feature_type: MotorTypeV3::Scalar { actuator_type },
                 feature_index: index as u32,
             };
@@ -679,7 +686,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..rotate_cmds.len() {
             let motor_config = MotorConfigurationV3 {
-                device_name: device.name().clone(),
+                device_name: name_from_device(&device),
                 feature_type: MotorTypeV3::Rotation,
                 feature_index: index as u32,
             };
@@ -689,7 +696,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         let linear_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
-                device_name: device.name().clone(),
+                device_name: name_from_device(&device),
                 feature_type: MotorTypeV3::Linear,
                 feature_index: index as u32,
             };
