@@ -131,6 +131,15 @@ Lovense Edge:1
 Lovense Max:0.45
 ```
 
+## Files
+
+Here is where buttplug lite stores its various files on your filesystem:
+
+|                             | Windows                                                    | macOS                                                                                   | *nix                                                                           |
+|-----------------------------|------------------------------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| **Configuration Directory** | `%APPDATA%\runtime-shady-backroom\buttplug-lite\config`    | `$HOME/Library/Application Support/io.github.runtime-shady-backroom.buttplug-lite`      | `$XDG_CONFIG_HOME/buttplug-lite` or `$HOME/.config/buttplug-lite`              |
+| **Log Directory**           | `%APPDATA%\runtime-shady-backroom\buttplug-lite\data\logs` | `$HOME/Library/Application Support/io.github.runtime-shady-backroom.buttplug-lite/logs` | `$XDG_DATA_HOME/buttplug-lite/logs` or `$HOME/.local/share/buttplug-lite/logs` |
+
 ## Feedback
 If you have bugs to report or ideas to suggest please let me know by opening an [issue](https://github.com/runtime-shady-backroom/buttplug-lite/issues) or starting a [discussion](https://github.com/runtime-shady-backroom/buttplug-lite/discussions).
 
