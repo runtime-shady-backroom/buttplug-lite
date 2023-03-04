@@ -113,7 +113,7 @@ async fn tokio_main() {
         EnvFilter::try_new("warn,buttplug_lite=info").unwrap()
     } else if args.verbose == 1 {
         // my debug logging, buttplug's info logging, everything gets warn
-        EnvFilter::try_new("warn,buttplug=info,buttplug_derive=info,buttplug_lite=debug").unwrap()
+        EnvFilter::try_new("warn,buttplug=info,buttplug::server::device::server_device_manager_event_loop=warn,buttplug_derive=info,buttplug_lite=debug").unwrap()
     } else if args.verbose == 2 {
         // my + buttplug's debug logging, everything gets info
         EnvFilter::try_new("info,buttplug=debug,buttplug_derive=debug,buttplug_lite=debug").unwrap()
@@ -332,7 +332,7 @@ async fn tokio_main() {
         let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
         let subscription = ApplicationStatusSubscriptionProvider::new(application_status_receiver);
-        gui::window::run(application_state_db, warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
+        gui::window::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.
@@ -348,6 +348,15 @@ async fn tokio_main() {
     // but first, wait for warp to close
     if let Err(e) = warp_shutdown_complete_rx.await {
         info!("error shutting down warp: {e:?}")
+    }
+
+    // it's be nice if I could shut down buttplug with `server.shutdown()`, but I'm forced to give server ownership to the connector
+    // it'd be nice if I could shut down buttplug with `connector.server_ref().shutdown();`, but I'm forced to give connector ownership to the client
+    let mut application_state_mutex = application_state_db.write().await;
+    if let Some(application_state) = application_state_mutex.deref_mut() {
+        if let Err(e) = application_state.client.disconnect().await {
+            warn!("Unable to disconnect internal client from internal server: {e}");
+        }
     }
 }
 
@@ -448,6 +457,10 @@ async fn start_buttplug_server(
     let server = server_builder
         .finish()
         .expect("Failed to initialize buttplug server");
+
+    // the following things can be stolen from the server and may be useful for duplicate device detection
+    //let device_manager = server.device_manager();
+    //let event_stream = server.event_stream();
 
     let connector = ButtplugInProcessClientConnectorBuilder::default()
         .server(server)

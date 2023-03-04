@@ -262,7 +262,7 @@ impl Application for Gui {
                     }
                     Message::NativeEventOccurred(event) => {
                         if let Event::Window(iced_native::window::Event::CloseRequested) = event {
-                            info!("received gui shutdown request"); //TODO: actually run shutdown code
+                            info!("received gui shutdown request");
                             iced::window::close()
                         } else {
                             Command::none()
