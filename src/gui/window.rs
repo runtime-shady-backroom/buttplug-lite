@@ -13,7 +13,7 @@ use iced::theme::Palette;
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
 use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
 use crate::configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
@@ -60,7 +60,6 @@ lazy_static! {
 }
 
 
-#[instrument(skip_all)]
 pub fn run(
     application_state_db: ApplicationStateDb,
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
@@ -178,7 +177,6 @@ impl Application for Gui {
         format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 
-    #[instrument(skip_all)]
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match self {
             Gui::Loading => {

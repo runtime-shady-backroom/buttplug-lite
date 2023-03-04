@@ -34,7 +34,7 @@ use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
@@ -101,7 +101,6 @@ fn main() {
     TOKIO_RUNTIME.block_on(tokio_main())
 }
 
-#[instrument(skip_all)]
 async fn tokio_main() {
     let args: CliArgs = CliArgs::parse();
 
@@ -431,7 +430,6 @@ fn create_tokio_runtime() -> tokio::runtime::Runtime {
 
 // start server, then while running process events
 // returns only when we disconnect from the server
-#[instrument(skip_all)]
 async fn start_buttplug_server(
     application_state_db: ApplicationStateDb,
     initial_config_loaded_tx: Option<Sender<()>>,
@@ -820,7 +818,6 @@ async fn device_config_handler(application_state_db: ApplicationStateDb) -> Resu
 }
 
 // haptic websocket handler
-#[instrument(skip_all)]
 async fn haptic_handler(
     websocket: warp::ws::WebSocket,
     application_state_db: ApplicationStateDb,
@@ -920,7 +917,6 @@ async fn haptic_handler(
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-#[instrument(skip_all)]
 fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
     let mut devices: HashMap<String, MotorSettings> = HashMap::new();
 

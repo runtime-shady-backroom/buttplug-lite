@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::task;
-use tracing::{instrument, warn};
+use tracing::warn;
 
 use crate::ApplicationStateDb;
 
@@ -21,7 +21,6 @@ const WATCHDOG_POLL_INTERVAL_MILLIS: u64 = 1000;
 // halt devices after this much time with no command received
 const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[instrument(skip_all)]
 pub fn start(watchdog_timeout_db: WatchdogTimeoutDb, buttplug_connector_db: ApplicationStateDb) {
     // spawn the watchdog task
     // if too much time passes with no input from the client, this halts all haptic devices
