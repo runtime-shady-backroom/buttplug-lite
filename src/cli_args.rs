@@ -18,4 +18,8 @@ pub struct CliArgs {
     /// Custom logging filter: https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/filter/struct.EnvFilter.html. This overrides `--verbose` setting.
     #[arg(short = 'f', long)]
     pub log_filter: Option<String>,
+
+    /// Run self-checks then immediately exit
+    #[arg(long)]
+    pub self_check: bool,
 }

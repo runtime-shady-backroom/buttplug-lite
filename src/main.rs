@@ -7,7 +7,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{convert, fs};
+use std::{convert, fs, io, process};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -44,6 +44,7 @@ use crate::configuration_minimal::ConfigurationMinimal;
 use crate::configuration_v2::ConfigurationV2;
 use crate::configuration_v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::device_status::DeviceStatus;
+use crate::exfil::{ProtocolAttributesType, ServerDeviceIdentifier};
 use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
 use crate::gui::window::TaggedMotor;
 use crate::motor_settings::MotorSettings;
@@ -59,7 +60,7 @@ mod cli_args;
 mod configuration_v3;
 mod configuration_minimal;
 mod update_checker;
-
+mod exfil;
 
 pub const CONFIG_VERSION: i32 = 3;
 pub const MAXIMUM_LOG_FILES: usize = 50;
@@ -104,6 +105,13 @@ fn main() {
 
 async fn tokio_main() {
     let args: CliArgs = CliArgs::parse();
+
+    // run self-checks to make sure our unsafe hack to steal private fields appears to be working
+    ServerDeviceIdentifier::test();
+
+    if args.self_check {
+        process::exit(0);
+    }
 
     let log_filter = if let Some(log_filter_string) = args.log_filter {
         // user is providing a custom filter and not using my verbosity presets at all
@@ -391,7 +399,7 @@ fn get_log_dir() -> PathBuf {
         .join(LOG_DIR_NAME)
 }
 
-fn create_log_dir_path() -> std::io::Result<PathBuf> {
+fn create_log_dir_path() -> io::Result<PathBuf> {
     let log_dir_path: PathBuf = get_log_dir();
     fs::create_dir_all(log_dir_path.as_path())?;
     clean_up_old_logs(log_dir_path.as_path())?;
@@ -400,7 +408,7 @@ fn create_log_dir_path() -> std::io::Result<PathBuf> {
     Ok(log_dir_path)
 }
 
-fn clean_up_old_logs(path: &Path) -> std::io::Result<()> {
+fn clean_up_old_logs(path: &Path) -> io::Result<()> {
     let mut paths = Vec::new();
     for entry in fs::read_dir(path)? {
         let entry = entry?;
@@ -537,7 +545,7 @@ async fn start_buttplug_server(
                 }
             };
 
-            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration, device_manager });
+            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration, device_manager: device_manager.clone() });
             drop(application_state_mutex); // prevent this section from requiring two locks
 
             if let Some(sender) = initial_config_loaded_tx {
@@ -548,11 +556,11 @@ async fn start_buttplug_server(
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {} #{}", dev.name(), dev.index());
+                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}", debug_name_from_device(&dev, &device_manager));
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
                         }
                         ButtplugClientEvent::DeviceRemoved(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {} #{}", dev.name(), dev.index());
+                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}", debug_name_from_device(&dev, &device_manager));
                             application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
                         }
                         ButtplugClientEvent::PingTimeout => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: ping timeout"),
@@ -668,11 +676,35 @@ struct DeviceList {
     devices: Vec<DeviceStatus>,
 }
 
+/// Get display name for device.
 #[inline(always)]
-fn name_from_device(device: &ButtplugClientDevice) -> String {
+fn display_name_from_device(device: &ButtplugClientDevice) -> String {
     device.name().clone()
     // once we want to handle duplicate devices:
     //format!("{}#{}", device.name(), device.index())
+}
+
+/// Get unique identifier for a device. This should ALWAYS be the same for a given device.
+#[inline(always)]
+fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
+    let device_info = device_manager.device_info(device.index())?;
+    let buttplug_device_id = device_info.identifier();
+    let exfiltrated_device_id: ServerDeviceIdentifier = buttplug_device_id.clone().into();
+    Some(
+        match exfiltrated_device_id.attributes_identifier {
+            ProtocolAttributesType::Identifier(attributes_identifier) => format!("{}://{}/{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address, attributes_identifier),
+            ProtocolAttributesType::Default => format!("{}://{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address),
+        }
+    )
+}
+
+/// Get a full debug name for a device. This is intended for logging.
+fn debug_name_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> String {
+    let name = display_name_from_device(device);
+    match id_from_device(device, device_manager) {
+        Some(id) => format!("{name}@{id}"),
+        None => name,
+    }
 }
 
 fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
@@ -693,7 +725,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
             let message_attributes: &ClientGenericDeviceMessageAttributes = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
-                device_name: name_from_device(&device),
+                device_name: display_name_from_device(&device),
                 feature_type: MotorTypeV3::Scalar { actuator_type },
                 feature_index: index as u32,
             };
@@ -703,7 +735,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..rotate_cmds.len() {
             let motor_config = MotorConfigurationV3 {
-                device_name: name_from_device(&device),
+                device_name: display_name_from_device(&device),
                 feature_type: MotorTypeV3::Rotation,
                 feature_index: index as u32,
             };
@@ -713,7 +745,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         let linear_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
-                device_name: name_from_device(&device),
+                device_name: display_name_from_device(&device),
                 feature_type: MotorTypeV3::Linear,
                 feature_index: index as u32,
             };

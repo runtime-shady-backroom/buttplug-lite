@@ -158,6 +158,7 @@ Options:
   -v, --verbose...               Sets the level of verbosity
   -c, --stdout                   Log to stdout instead of a log file
   -f, --log-filter <LOG_FILTER>  Custom logging filter: https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/filter/struct.EnvFilter.html. This overrides `--verbose` setting
+      --self-check               Run self-checks then immediately exit
   -h, --help                     Print help
   -V, --version                  Print version
 ```
