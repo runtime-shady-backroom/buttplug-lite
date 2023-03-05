@@ -3,6 +3,7 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use serde::Deserialize;
+
 use crate::CONFIG_VERSION;
 
 fn default_version() -> i32 {

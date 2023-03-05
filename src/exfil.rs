@@ -1,3 +1,7 @@
+// Copyright 2023 runtime-shady-backroom
+// This file is part of buttplug-lite.
+// buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
+
 use std::mem::size_of;
 
 use buttplug::server::device::configuration::ProtocolAttributesType as ButtplugProtocolAttributesType;
@@ -14,8 +18,6 @@ pub struct ServerDeviceIdentifier {
 }
 
 impl ServerDeviceIdentifier {
-
-
     /// make sure the compiler didn't screw us over by using different representations of identical structs
     pub fn test() {
         ServerDeviceIdentifier::test_same_size();

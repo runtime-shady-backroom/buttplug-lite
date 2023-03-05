@@ -128,7 +128,7 @@ impl TryFrom<MotorTypeV2> for MotorTypeV3 {
         match type_v2 {
             MotorTypeV2::Linear => Ok(MotorTypeV3::Linear),
             MotorTypeV2::Rotation => Ok(MotorTypeV3::Rotation),
-            MotorTypeV2::Vibration => Ok(MotorTypeV3::Scalar{actuator_type: ActuatorType::Vibrate}),
+            MotorTypeV2::Vibration => Ok(MotorTypeV3::Scalar { actuator_type: ActuatorType::Vibrate }),
             MotorTypeV2::Contraction => Err(()),
         }
     }

@@ -3,6 +3,7 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::collections::HashMap;
+
 use buttplug::core::message::ActuatorType;
 
 #[derive(Default)]

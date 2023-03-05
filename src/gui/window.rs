@@ -307,7 +307,7 @@ impl Application for Gui {
                 }
 
                 let content = Scrollable::new(
-                Column::new()
+                    Column::new()
                         .spacing(TABLE_SPACING)
                         .padding(TABLE_SPACING)
                         .width(Length::Fill)
@@ -350,7 +350,7 @@ impl Application for Gui {
                             Rule::horizontal(TABLE_SPACING)
                         )
                         .push(Text::new(example_message).size(TEXT_SIZE_SMALL))
-                    );
+                );
 
                 Container::new(content)
                     .width(Length::Fill)
@@ -475,7 +475,7 @@ impl TaggedMotor {
             .push(input_label(format!("{}", &self.motor)));
 
         let row = match &self.state {
-            TaggedMotorState::Tagged { tag  } => {
+            TaggedMotorState::Tagged { tag } => {
                 row.push(
                     TextInput::new("motor tag", tag, MotorMessage::TagUpdated)
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
