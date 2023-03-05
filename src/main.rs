@@ -175,7 +175,7 @@ async fn tokio_main() {
         let mut interval = tokio::time::interval(Duration::from_secs(1)); //TODO: turn this back to 30
         loop {
             interval.tick().await;
-            test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FREAKING RECEIVER?");
+            test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FUCKING RECEIVER? (I wrote this code, so it was me!)");
         }
     });
 
