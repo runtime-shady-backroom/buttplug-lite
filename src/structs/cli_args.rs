@@ -23,4 +23,8 @@ pub struct CliArgs {
     /// Run self-checks then immediately exit
     #[arg(long)]
     pub self_check: bool,
+
+    /// Emit periodic ApplicationStatusEvent ticks every <SECONDS> seconds
+    #[arg(long, id = "SECONDS")]
+    pub debug_ticks: Option<u64>,
 }

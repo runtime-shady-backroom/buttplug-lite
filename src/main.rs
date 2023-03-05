@@ -170,14 +170,16 @@ async fn tokio_main() {
     let (application_status_sender, application_status_receiver) = mpsc::unbounded_channel::<ApplicationStatusEvent>();
 
     // test ticks
-    let test_tick_sender = application_status_sender.clone();
-    task::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(1)); //TODO: turn this back to 30
-        loop {
-            interval.tick().await;
-            test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FUCKING RECEIVER? (I wrote this code, so it was me!)");
-        }
-    });
+    if let Some(interval) = args.debug_ticks {
+        let test_tick_sender = application_status_sender.clone();
+        task::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(interval));
+            loop {
+                interval.tick().await;
+                test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FUCKING RECEIVER? (I wrote this code, so it was me!)");
+            }
+        });
+    }
 
     // connector clone moved into reconnect task
     let reconnector_application_state_clone = application_state_db.clone();
