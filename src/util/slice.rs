@@ -160,6 +160,7 @@ pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> (&mut [T
 /// assert_eq!(duplicates, [21, 30, 13]);
 /// ```
 #[inline]
+#[allow(dead_code)]
 pub fn partition_dedup_by_key<T, K, F>(slice: &mut [T], mut key: F) -> (&mut [T], &mut [T])
     where
         F: FnMut(&mut T) -> K,

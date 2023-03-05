@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-use iced::{alignment::Alignment, Application, Color, Command, Element, Length, Settings, Subscription, Theme};
+use iced::{alignment::Alignment, Application, Color, Command, Element, Length, Settings, Subscription, Theme, theme};
 use iced::theme::Palette;
-use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
+use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, text_input, TextInput};
 use iced_native::Event;
 use lazy_static::lazy_static;
 use tokio::sync::mpsc::UnboundedSender;
@@ -251,48 +251,48 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::MotorMessage(motor_index, motor_message) => {
-                        let duplicates: Vec<usize> = {
-                            // motors that actually have a tag set, with their indices
-                            let mut indexed_tagged_motors: Vec<(usize, &TaggedMotor)> = state.motors.iter()
-                                .filter(|motor| motor.tag().is_some())
-                                .enumerate()
-                                .collect();
+                        // motor indices sorted by the tag they reference
+                        let mut indices: Vec<usize> = (0..state.motors.len()).collect();
+                        indices.sort_unstable_by_key(|i| state.motors[*i].tag());
 
-                            // get the motors with duplicate tags
-                            indexed_tagged_motors.sort_unstable_by_key(|(_index, motor)| motor.tag().unwrap());
-                            let (_, duplicates) = util::slice::partition_dedup_by_key(&mut indexed_tagged_motors, |(_index, motor)| motor.tag().unwrap());
-                            duplicates.iter()
-                                .map(|(index, _motor)| *index)
-                                .collect()
-                        };
+                        // find the duplicate indices
+                        let (_, duplicate_indices) = util::slice::partition_dedup_by(&mut indices, |index_a, index_b| {
+                            let motor_a = &state.motors[*index_a];
+                            let motor_b = &state.motors[*index_b];
+                            if let Some(motor_a_tag) = motor_a.tag() {
+                                if let Some(motor_b_tag) = motor_b.tag() {
+                                    motor_a_tag == motor_b_tag
+                                } else {
+                                    // motor_b had no tag, and the absence of a tag cannot be a duplicate
+                                    false
+                                }
+                            } else {
+                                // motor_a had no tag, and the absence of a tag cannot be a duplicate
+                                false
+                            }
+                        });
+
+                        // handle each motor with a duplicated tag
                         let mut this_motor_updated: bool = false;
-                        for index in duplicates {
+                        for duplicate_index in duplicate_indices {
                             // this index has a motor with a duplicate tag
-                            if motor_index == index {
+                            if &motor_index == duplicate_index {
                                 // remember that the motor we're about to update has already been processed
                                 this_motor_updated = true;
                             }
-                            match state.motors.get_mut(index) {
-                                Some(motor) => {
-                                    // safe to unwrap here as empty tags aren't considered to be duplicates
-                                    let tag: String = motor.tag().unwrap().to_string();
-                                    motor.update(MotorMessage::TagUpdated { tag, valid: false })
-                                }
-                                None => warn!("motor index out of bounds"),
-                            }
+                            let motor = &mut state.motors[*duplicate_index];
+                            // safe to unwrap here as empty tags aren't considered to be duplicates
+                            let tag: String = motor.tag().unwrap().to_string();
+                            motor.update(MotorMessage::TagUpdated { tag, valid: false })
                         }
 
                         if !this_motor_updated {
                             // this motor wasn't a duplicate, so do the normal logic
-                            match state.motors.get_mut(motor_index) {
-                                Some(motor) => {
-                                    match motor_message {
-                                        MotorMessage::TagUpdated { tag, .. } => motor.update(MotorMessage::TagUpdated { tag, valid: true }),
-                                        MotorMessage::TagDeleted => motor.update(motor_message),
-                                    };
-                                }
-                                None => warn!("motor index out of bounds"),
-                            }
+                            let motor = &mut state.motors[motor_index];
+                            match motor_message {
+                                MotorMessage::TagUpdated { tag, .. } => motor.update(MotorMessage::TagUpdated { tag, valid: true }),
+                                MotorMessage::TagDeleted => motor.update(motor_message),
+                            };
                         }
 
                         self.on_configuration_changed();
@@ -461,6 +461,85 @@ enum TaggedMotorState {
     Untagged,
 }
 
+impl text_input::StyleSheet for TaggedMotorState {
+    type Style = Theme;
+
+    fn active(&self, style: &Self::Style) -> text_input::Appearance {
+        let palette = style.extended_palette();
+
+        let border_color = match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            _ => palette.background.strong.color,
+        };
+
+        text_input::Appearance {
+            background: palette.background.base.color.into(),
+            border_radius: 2.0,
+            border_width: 1.0,
+            border_color,
+        }
+    }
+
+    fn focused(&self, style: &Self::Style) -> text_input::Appearance {
+        let palette = style.extended_palette();
+
+        let border_color = match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            _ => palette.primary.strong.color,
+        };
+
+        text_input::Appearance {
+            background: palette.background.base.color.into(),
+            border_radius: 2.0,
+            border_width: 1.0,
+            border_color,
+        }
+    }
+
+    fn placeholder_color(&self, style: &Self::Style) -> Color {
+        let palette = style.extended_palette();
+
+        match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            _ => palette.background.strong.color,
+        }
+    }
+
+    fn value_color(&self, style: &Self::Style) -> Color {
+        let palette = style.extended_palette();
+
+        match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.base.text,
+            _ => palette.background.base.text,
+        }
+    }
+
+    fn selection_color(&self, style: &Self::Style) -> Color {
+        let palette = style.extended_palette();
+
+        match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.weak.color,
+            _ => palette.primary.weak.color,
+        }
+    }
+
+    fn hovered(&self, style: &Self::Style) -> text_input::Appearance {
+        let palette = style.extended_palette();
+
+        let border_color = match self {
+            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.base.text,
+            _ => palette.background.base.text,
+        };
+
+        text_input::Appearance {
+            background: palette.background.base.color.into(),
+            border_radius: 2.0,
+            border_width: 1.0,
+            border_color,
+        }
+    }
+}
+
 impl Display for TaggedMotor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {:?}", self.motor, self.tag())
@@ -518,6 +597,7 @@ impl TaggedMotor {
                     TextInput::new("motor tag", tag, |text| MotorMessage::TagUpdated { tag: text, valid: *valid })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
+                        .style(theme::TextInput::Custom(Box::new(self.state.clone())))
                 )
                     .push(
                         Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
