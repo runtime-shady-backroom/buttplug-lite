@@ -4,7 +4,7 @@
 
 //! A cursed contraption to steal private fields from structs
 
-use std::mem::size_of;
+use std::mem::{size_of, size_of_val};
 
 use buttplug::server::device::configuration::ProtocolAttributesType as ButtplugProtocolAttributesType;
 use buttplug::server::device::server_device::ServerDeviceIdentifier as ButtplugServeDeviceIdentifier;
@@ -39,6 +39,7 @@ impl ServerDeviceIdentifier {
         let identifier = "ghi";
 
         let buttplug_id: ButtplugServeDeviceIdentifier = ButtplugServeDeviceIdentifier::new(address, protocol, &ButtplugProtocolAttributesType::Identifier(identifier.to_string()));
+        let buttplug_size = size_of_val(&buttplug_id);
         let buttplug_debug_string = format!("{buttplug_id:?}");
         let actual: ServerDeviceIdentifier = buttplug_id.into();
         let expected = ServerDeviceIdentifier {
@@ -47,6 +48,7 @@ impl ServerDeviceIdentifier {
             attributes_identifier: ProtocolAttributesType::Identifier(identifier.to_string()),
         };
         let our_debug_string = format!("{expected:?}");
+        assert_eq!(buttplug_size, size_of_val(&expected));
         assert_eq!(actual, expected);
         assert_eq!(buttplug_debug_string, our_debug_string);
     }
@@ -56,6 +58,7 @@ impl ServerDeviceIdentifier {
         let protocol = "mno";
 
         let buttplug_id: ButtplugServeDeviceIdentifier = ButtplugServeDeviceIdentifier::new(address, protocol, &ButtplugProtocolAttributesType::Default);
+        let buttplug_size = size_of_val(&buttplug_id);
         let buttplug_debug_string = format!("{buttplug_id:?}");
         let actual: ServerDeviceIdentifier = buttplug_id.into();
         let expected = ServerDeviceIdentifier {
@@ -64,12 +67,14 @@ impl ServerDeviceIdentifier {
             attributes_identifier: ProtocolAttributesType::Default,
         };
         let our_debug_string = format!("{expected:?}");
+        assert_eq!(buttplug_size, size_of_val(&expected));
         assert_eq!(actual, expected);
         assert_eq!(buttplug_debug_string, our_debug_string);
     }
 
     fn test_same_repr_empty_everything() {
         let buttplug_id: ButtplugServeDeviceIdentifier = ButtplugServeDeviceIdentifier::new("", "", &ButtplugProtocolAttributesType::Default);
+        let buttplug_size = size_of_val(&buttplug_id);
         let buttplug_debug_string = format!("{buttplug_id:?}");
         let actual: ServerDeviceIdentifier = buttplug_id.into();
         let expected = ServerDeviceIdentifier {
@@ -78,6 +83,7 @@ impl ServerDeviceIdentifier {
             attributes_identifier: ProtocolAttributesType::Default,
         };
         let our_debug_string = format!("{expected:?}");
+        assert_eq!(buttplug_size, size_of_val(&expected));
         assert_eq!(actual, expected);
         assert_eq!(buttplug_debug_string, our_debug_string);
     }
@@ -88,6 +94,7 @@ impl ServerDeviceIdentifier {
         let identifier = "P";
 
         let buttplug_id: ButtplugServeDeviceIdentifier = ButtplugServeDeviceIdentifier::new(address, protocol, &ButtplugProtocolAttributesType::Identifier(identifier.to_string()));
+        let buttplug_size = size_of_val(&buttplug_id);
         let buttplug_debug_string = format!("{buttplug_id:?}");
         let actual: ServerDeviceIdentifier = buttplug_id.into();
         let expected = ServerDeviceIdentifier {
@@ -96,6 +103,7 @@ impl ServerDeviceIdentifier {
             attributes_identifier: ProtocolAttributesType::Identifier(identifier.to_string()),
         };
         let our_debug_string = format!("{expected:?}");
+        assert_eq!(buttplug_size, size_of_val(&expected));
         assert_eq!(actual, expected);
         assert_eq!(buttplug_debug_string, our_debug_string);
         assert_eq!(r#"ServerDeviceIdentifier { address: "PeripheralId(FB:1E:14:5B:4F:3F)", protocol: "lovense", attributes_identifier: Identifier("P") }"#, our_debug_string);
