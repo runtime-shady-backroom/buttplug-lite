@@ -25,13 +25,13 @@ use buttplug::server::device::hardware::communication::btleplug::BtlePlugCommuni
 use buttplug::server::device::hardware::communication::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
 use buttplug::server::device::hardware::communication::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
 use buttplug::server::device::hardware::communication::serialport::SerialPortCommunicationManagerBuilder;
+use buttplug::server::device::ServerDeviceManager;
 use chrono::Local;
 use clap::Parser;
 use directories::ProjectDirs;
 use futures::StreamExt;
 use semver::Version;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
 use tracing::{debug, error, info, warn};
@@ -89,6 +89,7 @@ lazy_static! {
 pub struct ApplicationState {
     pub client: ButtplugClient,
     pub configuration: ConfigurationV3,
+    pub device_manager: Arc<ServerDeviceManager>,
 }
 
 #[derive(Debug)]
@@ -433,7 +434,7 @@ fn create_tokio_runtime() -> tokio::runtime::Runtime {
 async fn start_buttplug_server(
     application_state_db: ApplicationStateDb,
     initial_config_loaded_tx: Option<Sender<()>>,
-    application_status_event_sender: UnboundedSender<ApplicationStatusEvent>,
+    application_status_event_sender: mpsc::UnboundedSender<ApplicationStatusEvent>,
 ) {
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
@@ -456,9 +457,13 @@ async fn start_buttplug_server(
         .finish()
         .expect("Failed to initialize buttplug server");
 
-    // the following things can be stolen from the server and may be useful for duplicate device detection
-    //let device_manager = server.device_manager();
-    //let event_stream = server.event_stream();
+    /* We're allowed to steal a reference to this...
+     * and we're going to use it to get unique device IDs for duplicate device detection.
+     * This is absolutely an evil hack but I have ZERO idea how else I'm supposed to do this
+     * while using the ButtplugInProcessClientConnector, because the connector completely consumes
+     * the ButtplugServer struct.
+     */
+    let device_manager = server.device_manager();
 
     let connector = ButtplugInProcessClientConnectorBuilder::default()
         .server(server)
@@ -476,7 +481,7 @@ async fn start_buttplug_server(
             // reuse old config, or load from disk if this is the initial connection
             let previous_state = application_state_mutex.deref_mut().take();
             let configuration = match previous_state {
-                Some(ApplicationState { configuration, client: _ }) => configuration,
+                Some(ApplicationState { configuration, client: _, device_manager: _ }) => configuration,
                 None => {
                     info!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
                     let loaded_configuration: Result<ConfigurationMinimal, String> = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
@@ -532,8 +537,8 @@ async fn start_buttplug_server(
                 }
             };
 
-            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration });
-            drop(application_state_mutex); // prevent this section from requiring two
+            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration, device_manager });
+            drop(application_state_mutex); // prevent this section from requiring two locks
 
             if let Some(sender) = initial_config_loaded_tx {
                 sender.send(()).expect("failed to send config-loaded signal");
@@ -573,16 +578,17 @@ fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=convert::
     warp::any().map(move || db.clone())
 }
 
-pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: &UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
+pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: &mpsc::UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
     let previous_state = lock.deref_mut().take();
     match previous_state {
-        Some(ApplicationState { client, configuration: previous_configuration }) => {
+        Some(ApplicationState { client, configuration: previous_configuration, device_manager }) => {
             let new_port = configuration.port;
             *lock = Some(ApplicationState {
                 client,
                 configuration: configuration.clone(),
+                device_manager,
             });
             drop(lock);
 
