@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-use crate::CONFIG_VERSION;
+use super::CONFIG_VERSION;
 
 fn default_version() -> i32 {
     1

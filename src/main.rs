@@ -1,18 +1,14 @@
-// Copyright 2022 runtime-shady-backroom and buttplug-lite contributors.
+// Copyright 2022-2023 runtime-shady-backroom and buttplug-lite contributors.
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 #![windows_subsystem = "windows"]
 
-#[macro_use]
-extern crate lazy_static;
-
-use std::{convert, fs, io, process};
+use std::{convert, process};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::ops::DerefMut;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
@@ -26,9 +22,7 @@ use buttplug::server::device::hardware::communication::lovense_connect_service::
 use buttplug::server::device::hardware::communication::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
 use buttplug::server::device::hardware::communication::serialport::SerialPortCommunicationManagerBuilder;
 use buttplug::server::device::ServerDeviceManager;
-use chrono::Local;
 use clap::Parser;
-use directories::ProjectDirs;
 use futures::StreamExt;
 use semver::Version;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -36,34 +30,28 @@ use tokio::sync::oneshot::Sender;
 use tokio::task;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::util::SubscriberInitExt;
 use warp::Filter;
 
 use crate::cli_args::CliArgs;
-use crate::configuration_minimal::ConfigurationMinimal;
-use crate::configuration_v2::ConfigurationV2;
-use crate::configuration_v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
+use crate::config::v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::device_status::DeviceStatus;
-use crate::exfil::{ProtocolAttributesType, ServerDeviceIdentifier};
+use crate::exfiltrator::{ProtocolAttributesType, ServerDeviceIdentifier};
+use crate::extensions::FloatExtensions;
 use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
-use crate::gui::window::TaggedMotor;
+use crate::gui::TaggedMotor;
 use crate::motor_settings::MotorSettings;
 use crate::watchdog::WatchdogTimeoutDb;
 
-mod configuration_v2;
-mod watchdog;
-mod gui;
-mod executor;
-mod motor_settings;
-mod device_status;
 mod cli_args;
-mod configuration_v3;
-mod configuration_minimal;
+mod config;
+mod device_status;
+mod exfiltrator;
+mod extensions;
+mod gui;
+mod motor_settings;
 mod update_checker;
-mod exfil;
-
-pub const CONFIG_VERSION: i32 = 3;
-pub const MAXIMUM_LOG_FILES: usize = 50;
+mod util;
+mod watchdog;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
@@ -77,14 +65,6 @@ static BUTTPLUG_CLIENT_NAME: &str = "in-process-client";
 // log prefixes:
 static LOG_PREFIX_HAPTIC_ENDPOINT: &str = "/haptic";
 static LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
-
-static CONFIG_FILE_NAME: &str = "config.toml";
-static LOG_DIR_NAME: &str = "logs";
-
-lazy_static! {
-    static ref CONFIG_DIR_FILE_PATH: PathBuf = create_config_file_path();
-    pub static ref TOKIO_RUNTIME: tokio::runtime::Runtime = create_tokio_runtime();
-}
 
 // eventually I'd like some way to get a ref to the server in here
 pub struct ApplicationState {
@@ -100,7 +80,7 @@ pub enum ShutdownMessage {
 }
 
 fn main() {
-    TOKIO_RUNTIME.block_on(tokio_main())
+    util::GLOBAL_TOKIO_RUNTIME.block_on(tokio_main())
 }
 
 async fn tokio_main() {
@@ -134,27 +114,10 @@ async fn tokio_main() {
     };
 
     let _appender_guard = if args.stdout {
-        init_console_logging(log_filter);
+        util::logging::init_console_logging(log_filter);
         None
     } else {
-        match create_log_dir_path() {
-            Ok(log_dir_path) => {
-                let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());
-                let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-                tracing_subscriber::fmt()
-                    .with_ansi(false)
-                    .with_writer(non_blocking)
-                    .with_env_filter(log_filter)
-                    .finish()
-                    .init();
-                Some(guard)
-            }
-            Err(e) => {
-                init_console_logging(log_filter);
-                warn!("File-based logging failed. Falling back to stdout: {e}");
-                None
-            }
-        }
+        util::logging::try_init_file_logging(log_filter)
     };
     // now we can use tracing to log. Any tracing logs before this point go nowhere.
 
@@ -340,7 +303,7 @@ async fn tokio_main() {
         let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
         let subscription = ApplicationStatusSubscriptionProvider::new(application_status_receiver);
-        gui::window::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
+        gui::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.
@@ -366,75 +329,6 @@ async fn tokio_main() {
             warn!("Unable to disconnect internal client from internal server: {e}");
         }
     }
-}
-
-fn init_console_logging(log_filter: EnvFilter) {
-    tracing_subscriber::fmt()
-        .with_env_filter(log_filter)
-        .finish()
-        .init()
-}
-
-fn get_config_dir() -> PathBuf {
-    ProjectDirs::from("io.github", "runtime-shady-backroom", env!("CARGO_PKG_NAME"))
-        .expect("unable to locate configuration directory")
-        .config_dir()
-        .into()
-}
-
-fn create_config_file_path() -> PathBuf {
-    let config_dir_path: PathBuf = get_config_dir();
-    fs::create_dir_all(config_dir_path.as_path()).expect("failed to create configuration directory");
-    config_dir_path.join(CONFIG_FILE_NAME)
-}
-
-fn get_log_file_name() -> String {
-    Local::now().format("%Y-%m-%d_%H-%M-%S.log").to_string()
-}
-
-fn get_log_dir() -> PathBuf {
-    ProjectDirs::from("io.github", "runtime-shady-backroom", env!("CARGO_PKG_NAME"))
-        .expect("unable to locate configuration directory")
-        .data_dir()
-        .join(LOG_DIR_NAME)
-}
-
-fn create_log_dir_path() -> io::Result<PathBuf> {
-    let log_dir_path: PathBuf = get_log_dir();
-    fs::create_dir_all(log_dir_path.as_path())?;
-    clean_up_old_logs(log_dir_path.as_path())?;
-
-    // new log file
-    Ok(log_dir_path)
-}
-
-fn clean_up_old_logs(path: &Path) -> io::Result<()> {
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() && path.extension().map(|ext| ext == "log").unwrap_or(false) {
-            paths.push(path);
-        }
-    }
-    paths.sort_unstable();
-    if let Some(logs_to_delete) = paths.len().checked_sub(MAXIMUM_LOG_FILES) {
-        for path in paths.into_iter().take(logs_to_delete) {
-            fs::remove_file(path)?;
-        }
-    }
-    Ok(())
-}
-
-fn get_backup_config_file_path(version: i32) -> PathBuf {
-    get_config_dir().join(format!("backup_config_v{version}.toml"))
-}
-
-fn create_tokio_runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("failed to create tokio runtime")
 }
 
 // start server, then while running process events
@@ -491,57 +385,7 @@ async fn start_buttplug_server(
             let configuration = match previous_state {
                 Some(ApplicationState { configuration, client: _, device_manager: _ }) => configuration,
                 None => {
-                    info!("{}: Attempting to load config from {:?}", LOG_PREFIX_BUTTPLUG_SERVER, *CONFIG_DIR_FILE_PATH);
-                    let loaded_configuration: Result<ConfigurationMinimal, String> = fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                        .map_err(|e| format!("{e:?}"))
-                        .and_then(|string| toml::from_str(&string).map_err(|e| format!("{e:?}")));
-                    let configuration: ConfigurationV3 = match loaded_configuration {
-                        Ok(configuration) => {
-                            let loaded_configuration: Result<ConfigurationV3, String> = if configuration.version < 3 {
-                                fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
-                                info!("converting v{} config to v{}", configuration.version, CONFIG_VERSION);
-                                fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                                    .map_err(|e| format!("{e:?}"))
-                                    .and_then(|string| toml::from_str::<ConfigurationV2>(&string).map_err(|e| format!("{e:?}")))
-                                    .map(|config| config.into())
-                            } else {
-                                fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
-                                    .map_err(|e| format!("{e:?}"))
-                                    .and_then(|string| toml::from_str::<ConfigurationV3>(&string).map_err(|e| format!("{e:?}")))
-                            };
-
-                            match loaded_configuration {
-                                Ok(configuration) => configuration,
-                                Err(e) => {
-                                    // attempt to backup old config file when read fails
-                                    fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
-                                    warn!("falling back to default config due to error: {e}");
-                                    ConfigurationV3::default()
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            warn!("falling back to default config due to error: {e}");
-                            ConfigurationV3::default()
-                        }
-                    };
-                    info!("{LOG_PREFIX_BUTTPLUG_SERVER}: Loaded configuration v{} from disk", configuration.version);
-
-                    if configuration.is_outdated() {
-                        let new_configuration = configuration.new_with_current_version();
-                        match save_configuration(&new_configuration).await {
-                            Ok(_) => {
-                                info!("{LOG_PREFIX_BUTTPLUG_SERVER}: Migrated configuration to new directory");
-                                new_configuration
-                            }
-                            Err(e) => {
-                                warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: Error migrating configuration to new directory: {e}");
-                                configuration
-                            }
-                        }
-                    } else {
-                        configuration
-                    }
+                    config::load_configuration().await
                 }
             };
 
@@ -584,42 +428,6 @@ async fn start_buttplug_server(
 
 fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=convert::Infallible> + Clone {
     warp::any().map(move || db.clone())
-}
-
-pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: &mpsc::UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
-    save_configuration(&configuration).await?;
-    let mut lock = application_state_db.write().await;
-    let previous_state = lock.deref_mut().take();
-    match previous_state {
-        Some(ApplicationState { client, configuration: previous_configuration, device_manager }) => {
-            let new_port = configuration.port;
-            *lock = Some(ApplicationState {
-                client,
-                configuration: configuration.clone(),
-                device_manager,
-            });
-            drop(lock);
-
-            // restart warp if necessary
-            if new_port != previous_configuration.port {
-                warp_shutdown_tx.send(ShutdownMessage::Restart)
-                    .map_err(|e| format!("{e:?}"))?;
-            }
-
-            Ok(configuration)
-        }
-        None => Err("cannot update configuration until after initial haptic server startup".into())
-    }
-}
-
-async fn save_configuration(configuration: &ConfigurationV3) -> Result<(), String> {
-    // config serialization should never fail, so we should be good to panic
-    let serialized_config = toml::to_string(configuration).expect("failed to serialize configuration");
-    task::spawn_blocking(|| {
-        fs::write(CONFIG_DIR_FILE_PATH.as_path(), serialized_config).map_err(|e| format!("{e:?}"))
-    }).await
-        .map_err(|e| format!("{e:?}"))
-        .and_then(convert::identity)
 }
 
 /// full list of all device information we could ever want
@@ -1034,18 +842,4 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
 
     // Ok(&mut devices)
     Ok(devices)
-}
-
-trait FloatExtensions {
-    fn filter_nan(self) -> Self;
-}
-
-impl FloatExtensions for f64 {
-    fn filter_nan(self) -> f64 {
-        if self.is_nan() {
-            0.0
-        } else {
-            self
-        }
-    }
 }

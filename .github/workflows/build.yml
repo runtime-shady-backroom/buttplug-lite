@@ -1,4 +1,4 @@
-# Copyright 2022 runtime-shady-backroom
+# Copyright 2022-2023 runtime-shady-backroom
 # This file is part of buttplug-lite.
 # buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -54,7 +54,9 @@ jobs:
         if: matrix.target.runs-on == 'ubuntu-latest'
         run: sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev # libdbus-sys needs {ibdbus-1-dev, pkg-config}. libudev-sys needs {libudev-dev}
       - name: Test
-        run: cargo test
+        # I intentionally build tests as release so the work can be reused in the build step.
+        # This is slower in the case where tests fail, but significantly faster in the case where they pass.
+        run: cargo test --release
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
       - name: Self-check

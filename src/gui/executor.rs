@@ -5,6 +5,8 @@
 use futures::Future;
 use iced::Executor;
 
+use crate::util::GLOBAL_TOKIO_RUNTIME;
+
 /// Implementation of Tokio executor for iced
 /// This does two notable things:
 /// 1. Lets us use a modern Tokio, bypassing iced's dependency on tokio 0.2.x
@@ -15,7 +17,7 @@ pub struct TokioExecutor {
 
 impl Executor for TokioExecutor {
     fn new() -> Result<Self, futures::io::Error> {
-        Ok(TokioExecutor { rt: crate::TOKIO_RUNTIME.handle().clone() })
+        Ok(TokioExecutor { rt: GLOBAL_TOKIO_RUNTIME.handle().clone() })
     }
 
     fn spawn(&self, future: impl Future<Output=()> + Send + 'static) {

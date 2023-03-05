@@ -10,8 +10,9 @@ use buttplug::core::message::ActuatorType as ButtplugActuatorType;
 use buttplug::core::message::ButtplugDeviceMessageType;
 use serde::{Deserialize, Serialize};
 
-use crate::{CONFIG_VERSION, ConfigurationV2};
-use crate::configuration_v2::{MotorConfigurationV2, MotorTypeV2};
+use crate::config::v2::{ConfigurationV2, MotorConfigurationV2, MotorTypeV2};
+
+use super::CONFIG_VERSION;
 
 const DEFAULT_PORT: u16 = 3031;
 

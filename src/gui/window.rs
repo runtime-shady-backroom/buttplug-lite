@@ -1,4 +1,4 @@
-// Copyright 2022 runtime-shady-backroom
+// Copyright 2022-2023 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -15,11 +15,11 @@ use iced_native::Event;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
-use crate::{ApplicationStateDb, ApplicationStatus, ApplicationStatusEvent, ShutdownMessage};
-use crate::configuration_v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
+use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage};
+use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::device_status::DeviceStatus;
-use crate::executor::TokioExecutor;
-use crate::gui::subscription::ApplicationStatusSubscriptionProvider;
+use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
+use crate::gui::TokioExecutor;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: f32 = 75.0;
@@ -535,7 +535,7 @@ async fn get_tagged_devices(application_state_db: ApplicationStateDb) -> Option<
 }
 
 async fn update_configuration(application_state_db: ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
-    crate::update_configuration(&application_state_db, configuration, &warp_shutdown_tx).await
+    crate::config::update_configuration(&application_state_db, configuration, &warp_shutdown_tx).await
 }
 
 fn tags_from_application_status(motors: &[TaggedMotor]) -> HashMap<String, MotorConfigurationV3> {
