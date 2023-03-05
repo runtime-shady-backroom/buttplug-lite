@@ -373,6 +373,7 @@ impl Application for Gui {
                                 row.push(
                                     Button::new(Text::new("Update Available!"))
                                         .on_press(Message::UpdateButtonPressed)
+                                        .style(theme::Button::Destructive)
                                 )
                             } else {
                                 row
