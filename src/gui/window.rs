@@ -5,11 +5,10 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use iced::{alignment::Alignment, Application, Color, Command, Element, Length, Settings, Subscription, Theme, theme};
-use iced::theme::Palette;
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, text_input, TextInput};
 use iced_native::Event;
 use lazy_static::lazy_static;
@@ -31,7 +30,7 @@ const TEXT_SIZE_SMALL: u16 = 12;
 const TEXT_SIZE_DEFAULT: f32 = 20.0;
 const TEXT_SIZE_BIG: u16 = 30;
 
-const DARK_PALETTE: Palette = Palette {
+const DARK_PALETTE: theme::Palette = theme::Palette {
     background: Color::from_rgb(
         0x36 as f32 / 255.0,
         0x39 as f32 / 255.0,
@@ -107,7 +106,7 @@ enum Message {
     RefreshDevicesComplete(Option<ApplicationStatus>),
     SaveConfigurationComplete(Result<ConfigurationV3, String>),
     PortUpdated(String),
-    MotorMessage(usize, MotorMessage),
+    MotorMessageContainer(usize, MotorMessage),
     NativeEventOccurred(Event),
     Tick,
     UpdateButtonPressed,
@@ -127,6 +126,7 @@ struct State {
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
     configuration_dirty: bool,
+    motor_tags_valid: bool,
     saving: bool,
     last_configuration: ConfigurationV3,
     application_status_subscription: ApplicationStatusSubscriptionProvider,
@@ -147,6 +147,7 @@ impl Gui {
             warp_restart_tx: flags.warp_restart_tx,
             application_state_db: flags.application_state_db,
             configuration_dirty: ConfigurationV3::is_version_outdated(config_version),
+            motor_tags_valid: true,
             saving: false,
             last_configuration: configuration,
             application_status_subscription: flags.application_status_subscription,
@@ -207,6 +208,7 @@ impl Application for Gui {
                                     warp_restart_tx: old_state.warp_restart_tx,
                                     application_state_db: old_state.application_state_db,
                                     configuration_dirty: old_state.configuration_dirty,
+                                    motor_tags_valid: old_state.motor_tags_valid,
                                     saving: old_state.saving,
                                     last_configuration: old_state.last_configuration,
                                     application_status_subscription: old_state.application_status_subscription,
@@ -233,7 +235,6 @@ impl Application for Gui {
 
                             state.port_text = state.port.to_string();
 
-                            // TODO: validate tags
                             let configuration = ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
                             Command::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
                         }
@@ -258,17 +259,18 @@ impl Application for Gui {
                         self.on_configuration_changed();
                         Command::none()
                     }
-                    Message::MotorMessage(motor_index, motor_message) => {
+                    Message::MotorMessageContainer(motor_index, motor_message) => {
+                        // this happens BEFORE state.motors is updated with the new information passed via this message
+
                         // motor indices sorted by the tag they reference
                         let mut indices: Vec<usize> = (0..state.motors.len()).collect();
-                        indices.sort_unstable_by_key(|i| state.motors[*i].tag());
+                        indices.sort_unstable_by_key(|i| override_tag_at_index(&state.motors, *i, motor_index, motor_message.tag()));
 
                         // find the duplicate indices
-                        let (_, duplicate_indices) = util::slice::partition_dedup_by(&mut indices, |index_a, index_b| {
-                            let motor_a = &state.motors[*index_a];
-                            let motor_b = &state.motors[*index_b];
-                            if let Some(motor_a_tag) = motor_a.tag() {
-                                if let Some(motor_b_tag) = motor_b.tag() {
+                        // note that this will leave one index from each group in the unique portion: we'll fix this later
+                        let split_point = util::slice::partition_dedup_by(&mut indices, |index_a, index_b| {
+                            if let Some(motor_a_tag) = override_tag_at_index(&state.motors, *index_a, motor_index, motor_message.tag()) {
+                                if let Some(motor_b_tag) = override_tag_at_index(&state.motors, *index_b, motor_index, motor_message.tag()) {
                                     motor_a_tag == motor_b_tag
                                 } else {
                                     // motor_b had no tag, and the absence of a tag cannot be a duplicate
@@ -280,29 +282,41 @@ impl Application for Gui {
                             }
                         });
 
-                        // handle each motor with a duplicated tag
-                        let mut this_motor_updated: bool = false;
-                        for duplicate_index in duplicate_indices {
-                            // this index has a motor with a duplicate tag
-                            if &motor_index == duplicate_index {
-                                // remember that the motor we're about to update has already been processed
-                                this_motor_updated = true;
+                        // do a second pass to pull out the rest of the duplicates
+                        let (unique_indices, duplicate_indices) = indices.split_at_mut(split_point);
+                        let split_point = itertools::partition(unique_indices, |unique_index| {
+                            let unique_tag = override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag());
+                            !duplicate_indices.iter().any(|duplicate_index| {
+                                let duplicate_tag = override_tag_at_index(&state.motors, *duplicate_index, motor_index, motor_message.tag());
+                                unique_tag == duplicate_tag
+                            })
+                        });
+                        let (unique_indices, duplicate_indices) = indices.split_at(split_point);
+
+                        // handle each motor with a unique tag
+                        let mut tags_valid = true;
+                        for unique_index in unique_indices {
+                            let tag = override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag()).map(|t| t.to_string());
+                            let motor = &mut state.motors[*unique_index];
+                            match tag {
+                                Some(tag) => {
+                                    let valid = is_tag_valid(&tag);
+                                    tags_valid &= valid; // any falses need to stick
+                                    motor.update(MotorMessage::TagUpdated { tag, valid })
+                                }
+                                None => motor.update(MotorMessage::TagDeleted),
                             }
+                        }
+
+                        // handle each motor with a duplicated tag
+                        for duplicate_index in duplicate_indices {
+                            // safe to unwrap here as duplicate motors cannot have a missing tag
+                            let tag = override_tag_at_index(&state.motors, *duplicate_index, motor_index, motor_message.tag()).unwrap().to_string();
                             let motor = &mut state.motors[*duplicate_index];
-                            // safe to unwrap here as empty tags aren't considered to be duplicates
-                            let tag: String = motor.tag().unwrap().to_string();
-                            motor.update(MotorMessage::TagUpdated { tag, valid: false })
+                            motor.update(MotorMessage::TagUpdated { tag, valid: false });
                         }
 
-                        if !this_motor_updated {
-                            // this motor wasn't a duplicate, so do the normal logic
-                            let motor = &mut state.motors[motor_index];
-                            match motor_message {
-                                MotorMessage::TagUpdated { tag, .. } => motor.update(MotorMessage::TagUpdated { tag, valid: true }),
-                                MotorMessage::TagDeleted => motor.update(motor_message),
-                            };
-                        }
-
+                        state.motor_tags_valid = duplicate_indices.is_empty() && tags_valid;
                         self.on_configuration_changed();
                         Command::none()
                     }
@@ -342,7 +356,7 @@ impl Application for Gui {
                     "save & apply configuration"
                 };
                 let mut save_button = Button::new(Text::new(save_button_text));
-                if state.configuration_dirty && !state.saving {
+                if save_allowed(state) {
                     save_button = save_button.on_press(Message::SaveConfigurationRequest);
                 }
 
@@ -460,6 +474,15 @@ enum MotorMessage {
     TagDeleted,
 }
 
+impl MotorMessage {
+    fn tag(&self) -> Option<&str> {
+        match self {
+            MotorMessage::TagUpdated { tag, .. } => Some(tag),
+            MotorMessage::TagDeleted => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 enum TaggedMotorState {
     Tagged {
@@ -469,14 +492,28 @@ enum TaggedMotorState {
     Untagged,
 }
 
-impl text_input::StyleSheet for TaggedMotorState {
+enum ElementAppearance {
+    Valid,
+    Invalid,
+}
+
+impl From<&TaggedMotorState> for ElementAppearance {
+    fn from(value: &TaggedMotorState) -> Self {
+        match value {
+            TaggedMotorState::Tagged { valid: false, .. } => ElementAppearance::Invalid,
+            _ => ElementAppearance::Valid,
+        }
+    }
+}
+
+impl text_input::StyleSheet for ElementAppearance {
     type Style = Theme;
 
     fn active(&self, style: &Self::Style) -> text_input::Appearance {
         let palette = style.extended_palette();
 
         let border_color = match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            ElementAppearance::Invalid => palette.danger.strong.color,
             _ => palette.background.strong.color,
         };
 
@@ -492,7 +529,7 @@ impl text_input::StyleSheet for TaggedMotorState {
         let palette = style.extended_palette();
 
         let border_color = match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            ElementAppearance::Invalid => palette.danger.strong.color,
             _ => palette.primary.strong.color,
         };
 
@@ -508,7 +545,7 @@ impl text_input::StyleSheet for TaggedMotorState {
         let palette = style.extended_palette();
 
         match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.strong.color,
+            ElementAppearance::Invalid => palette.danger.strong.color,
             _ => palette.background.strong.color,
         }
     }
@@ -517,7 +554,7 @@ impl text_input::StyleSheet for TaggedMotorState {
         let palette = style.extended_palette();
 
         match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.base.text,
+            ElementAppearance::Invalid => palette.danger.base.text,
             _ => palette.background.base.text,
         }
     }
@@ -526,7 +563,7 @@ impl text_input::StyleSheet for TaggedMotorState {
         let palette = style.extended_palette();
 
         match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.weak.color,
+            ElementAppearance::Invalid => palette.danger.weak.color,
             _ => palette.primary.weak.color,
         }
     }
@@ -535,7 +572,7 @@ impl text_input::StyleSheet for TaggedMotorState {
         let palette = style.extended_palette();
 
         let border_color = match self {
-            TaggedMotorState::Tagged { valid: false, .. } => palette.danger.base.text,
+            ElementAppearance::Invalid => palette.danger.base.text,
             _ => palette.background.base.text,
         };
 
@@ -600,12 +637,11 @@ impl TaggedMotor {
 
         let row = match &self.state {
             TaggedMotorState::Tagged { tag, valid } => {
-                //TODO: figure out how to make this some sort of error color
                 row.push(
                     TextInput::new("motor tag", tag, |text| MotorMessage::TagUpdated { tag: text, valid: *valid })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
-                        .style(theme::TextInput::Custom(Box::new(self.state.clone())))
+                        .style(theme::TextInput::Custom(Box::new(ElementAppearance::from(&self.state))))
                 )
                     .push(
                         Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
@@ -635,7 +671,7 @@ fn render_motor_list(motors: &Vec<TaggedMotor>) -> Element<Message> {
         motors.iter()
             .enumerate()
             .fold(col, |column, (i, motor)| {
-                column.push(motor.view().map(move |message| Message::MotorMessage(i, message)))
+                column.push(motor.view().map(move |message| Message::MotorMessageContainer(i, message)))
             })
     };
     col.into()
@@ -690,4 +726,23 @@ fn input_label<'a, S: Into<Cow<'a, str>>, T: 'a>(label: S) -> Element<'a, T> {
     Container::new(text)
         .padding(TEXT_INPUT_PADDING)
         .into()
+}
+
+#[inline(always)]
+fn override_tag_at_index<'a>(slice: &'a [TaggedMotor], read_index: usize, override_index: usize, override_value: Option<&'a str>) -> Option<&'a str> {
+    if read_index == override_index {
+        override_value
+    } else {
+        slice[read_index].tag()
+    }
+}
+
+#[inline(always)]
+fn save_allowed(state: &State) -> bool {
+    state.configuration_dirty && state.motor_tags_valid && !state.saving
+}
+
+#[inline(always)]
+fn is_tag_valid(tag: &str) -> bool {
+    !tag.contains(':') && !tag.contains(';')
 }

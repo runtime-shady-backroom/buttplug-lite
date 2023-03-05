@@ -369,6 +369,7 @@ dependencies = [
  "iced",
  "iced_futures",
  "iced_native",
+ "itertools",
  "lazy_static",
  "open",
  "semver",

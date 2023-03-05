@@ -33,7 +33,7 @@ use std::mem;
 /// assert_eq!(duplicates, ["bar", "Foo", "BAZ"]);
 /// ```
 #[inline]
-pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
+pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> usize
     where
         F: FnMut(&mut T, &mut T) -> bool,
 {
@@ -96,7 +96,7 @@ pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> (&mut [T
 
     let len = slice.len();
     if len <= 1 {
-        return (slice, &mut []);
+        return len;
     }
 
     let ptr = slice.as_mut_ptr();
@@ -134,37 +134,5 @@ pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> (&mut [T
         }
     }
 
-    slice.split_at_mut(next_write)
-}
-
-// source: https://doc.rust-lang.org/src/core/slice/mod.rs.html#3012-3015
-// tracking issue: https://github.com/rust-lang/rust/issues/54279
-/// Moves all but the first of consecutive elements to the end of the slice that resolve
-/// to the same key.
-///
-/// Returns two slices. The first contains no consecutive repeated elements.
-/// The second contains all the duplicates in no specified order.
-///
-/// If the slice is sorted, the first returned slice contains no duplicates.
-///
-/// # Examples
-///
-/// ```
-/// #![feature(slice_partition_dedup)]
-///
-/// let mut slice = [10, 20, 21, 30, 30, 20, 11, 13];
-///
-/// let (dedup, duplicates) = slice.partition_dedup_by_key(|i| *i / 10);
-///
-/// assert_eq!(dedup, [10, 20, 30, 20, 11]);
-/// assert_eq!(duplicates, [21, 30, 13]);
-/// ```
-#[inline]
-#[allow(dead_code)]
-pub fn partition_dedup_by_key<T, K, F>(slice: &mut [T], mut key: F) -> (&mut [T], &mut [T])
-    where
-        F: FnMut(&mut T) -> K,
-        K: PartialEq,
-{
-    partition_dedup_by(slice, |a, b| key(a) == key(b))
+    next_write
 }
