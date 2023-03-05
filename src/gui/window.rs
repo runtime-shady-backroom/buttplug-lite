@@ -12,14 +12,15 @@ use iced::{alignment::Alignment, Application, Color, Command, Element, Length, S
 use iced::theme::Palette;
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
+use lazy_static::lazy_static;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
-use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage};
+use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage, util};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
-use crate::device_status::DeviceStatus;
 use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
 use crate::gui::TokioExecutor;
+use crate::structs::DeviceStatus;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: f32 = 75.0;
@@ -29,7 +30,6 @@ const EOL_INPUT_SPACING: u16 = 5;
 const TEXT_SIZE_SMALL: u16 = 12;
 const TEXT_SIZE_DEFAULT: f32 = 20.0;
 const TEXT_SIZE_BIG: u16 = 30;
-const TEXT_SIZE_MASSIVE: u16 = 50;
 
 const DARK_PALETTE: Palette = Palette {
     background: Color::from_rgb(
@@ -114,8 +114,8 @@ enum Message {
 }
 
 enum Gui {
-    /// intermediate state used during transitions
-    Loading,
+    /// intermediate state used for memory-fuckery reasons during transitions
+    Invalid,
     Loaded(State),
 }
 
@@ -179,8 +179,8 @@ impl Application for Gui {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match self {
-            Gui::Loading => {
-                Command::none()
+            Gui::Invalid => {
+                panic!("GUI was unexpectedly in an invalid state");
             }
             Gui::Loaded(state) => {
                 match message {
@@ -191,7 +191,7 @@ impl Application for Gui {
                     Message::RefreshDevicesComplete(application_status) => {
                         if let Some(application_status) = application_status {
                             // we conduct the ol' switcharoo to move our old state into the new state without having to clone absolutely everything
-                            if let Gui::Loaded(old_state) = std::mem::replace(self, Gui::Loading) {
+                            if let Gui::Loaded(old_state) = std::mem::replace(self, Gui::Invalid) {
                                 *self = Gui::Loaded(State {
                                     devices: application_status.devices,
                                     motors: application_status.motors,
@@ -207,7 +207,7 @@ impl Application for Gui {
                                 });
                             } else {
                                 // this should never happen
-                                panic!("GUI was unexpectedly not in loaded state");
+                                panic!("GUI was unexpectedly in an invalid state");
                             }
                         } else {
                             panic!("Application was unexpectedly not in loaded state");
@@ -217,8 +217,8 @@ impl Application for Gui {
                     }
                     Message::SaveConfigurationRequest => {
                         if state.saving {
-                            // this should not be possible
-                            panic!("save pressed but we're already saving!");
+                            debug!("Save requested but we're already saving! I didn't realize this was possible… but I handled it anyways");
+                            Command::none()
                         } else {
                             info!("save initiated");
                             state.saving = true;
@@ -250,11 +250,51 @@ impl Application for Gui {
                         self.on_configuration_changed();
                         Command::none()
                     }
-                    Message::MotorMessage(i, motor_message) => {
-                        match state.motors.get_mut(i) {
-                            Some(motor) => motor.update(motor_message),
-                            None => warn!("motor index out of bounds"),
+                    Message::MotorMessage(motor_index, motor_message) => {
+                        let duplicates: Vec<usize> = {
+                            // motors that actually have a tag set, with their indices
+                            let mut indexed_tagged_motors: Vec<(usize, &TaggedMotor)> = state.motors.iter()
+                                .filter(|motor| motor.tag().is_some())
+                                .enumerate()
+                                .collect();
+
+                            // get the motors with duplicate tags
+                            indexed_tagged_motors.sort_unstable_by_key(|(_index, motor)| motor.tag().unwrap());
+                            let (_, duplicates) = util::slice::partition_dedup_by_key(&mut indexed_tagged_motors, |(_index, motor)| motor.tag().unwrap());
+                            duplicates.iter()
+                                .map(|(index, _motor)| *index)
+                                .collect()
+                        };
+                        let mut this_motor_updated: bool = false;
+                        for index in duplicates {
+                            // this index has a motor with a duplicate tag
+                            if motor_index == index {
+                                // remember that the motor we're about to update has already been processed
+                                this_motor_updated = true;
+                            }
+                            match state.motors.get_mut(index) {
+                                Some(motor) => {
+                                    // safe to unwrap here as empty tags aren't considered to be duplicates
+                                    let tag: String = motor.tag().unwrap().to_string();
+                                    motor.update(MotorMessage::TagUpdated { tag, valid: false })
+                                }
+                                None => warn!("motor index out of bounds"),
+                            }
                         }
+
+                        if !this_motor_updated {
+                            // this motor wasn't a duplicate, so do the normal logic
+                            match state.motors.get_mut(motor_index) {
+                                Some(motor) => {
+                                    match motor_message {
+                                        MotorMessage::TagUpdated { tag, .. } => motor.update(MotorMessage::TagUpdated { tag, valid: true }),
+                                        MotorMessage::TagDeleted => motor.update(motor_message),
+                                    };
+                                }
+                                None => warn!("motor index out of bounds"),
+                            }
+                        }
+
                         self.on_configuration_changed();
                         Command::none()
                     }
@@ -282,16 +322,8 @@ impl Application for Gui {
 
     fn view(&self) -> Element<Message> {
         match self {
-            Gui::Loading => {
-                Container::new(
-                    Text::new("Loading…")
-                        .size(TEXT_SIZE_MASSIVE)
-                )
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .center_x()
-                    .center_y()
-                    .into()
+            Gui::Invalid => {
+                panic!("GUI was unexpectedly in an invalid state");
             }
             Gui::Loaded(state) => {
                 let example_message = format!("example message: {}", build_example_message(&state.motors));
@@ -379,7 +411,7 @@ impl Application for Gui {
                     });
                 Subscription::batch(vec![application_events, native_events])
             }
-            Gui::Loading => native_events,
+            Gui::Invalid => panic!("GUI was unexpectedly in an invalid state"),
         }
     }
 }
@@ -413,7 +445,10 @@ impl Ord for TaggedMotor {
 
 #[derive(Clone, Debug)]
 enum MotorMessage {
-    TagUpdated(String),
+    TagUpdated {
+        tag: String,
+        valid: bool,
+    },
     TagDeleted,
 }
 
@@ -421,6 +456,7 @@ enum MotorMessage {
 enum TaggedMotorState {
     Tagged {
         tag: String,
+        valid: bool,
     },
     Untagged,
 }
@@ -436,6 +472,7 @@ impl TaggedMotor {
         let state = match tag {
             Some(tag) => TaggedMotorState::Tagged {
                 tag,
+                valid: true,
             },
             None => TaggedMotorState::Untagged,
         };
@@ -448,18 +485,18 @@ impl TaggedMotor {
 
     fn tag(&self) -> Option<&str> {
         match &self.state {
-            TaggedMotorState::Tagged { tag } => Some(tag),
+            TaggedMotorState::Tagged { tag, .. } => Some(tag),
             TaggedMotorState::Untagged => None
         }
     }
 
     fn update(&mut self, message: MotorMessage) {
         match message {
-            MotorMessage::TagUpdated(tag) => {
+            MotorMessage::TagUpdated { tag, valid } => {
                 if tag.is_empty() {
                     self.state = TaggedMotorState::Untagged;
                 } else {
-                    self.state = TaggedMotorState::Tagged { tag };
+                    self.state = TaggedMotorState::Tagged { tag, valid };
                 }
             }
             MotorMessage::TagDeleted => {
@@ -475,9 +512,10 @@ impl TaggedMotor {
             .push(input_label(format!("{}", &self.motor)));
 
         let row = match &self.state {
-            TaggedMotorState::Tagged { tag } => {
+            TaggedMotorState::Tagged { tag, valid } => {
+                //TODO: figure out how to make this some sort of error color
                 row.push(
-                    TextInput::new("motor tag", tag, MotorMessage::TagUpdated)
+                    TextInput::new("motor tag", tag, |text| MotorMessage::TagUpdated { tag: text, valid: *valid })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
@@ -488,7 +526,7 @@ impl TaggedMotor {
             }
             TaggedMotorState::Untagged => {
                 row.push(
-                    TextInput::new("motor tag", "", MotorMessage::TagUpdated)
+                    TextInput::new("motor tag", "", |text| MotorMessage::TagUpdated { tag: text, valid: true })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )

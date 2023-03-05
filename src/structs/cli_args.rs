@@ -4,6 +4,7 @@
 
 use clap::Parser;
 
+/// struct used to derive Clap arguments
 #[derive(Parser)]
 #[command(author = "runtime", version, about, long_about = None)]
 pub struct CliArgs {

@@ -55,7 +55,7 @@ fn unix_time_plus(plus: Duration) -> i64 {
         .add(plus)
         .as_millis();
 
-    // probably fine to panic if your system clock is before the unix epoch...
+    // probably fine to panic if your system clock is before the unix epoch…
     i64::try_from(unix_time).expect("System time out of range")
 }
 

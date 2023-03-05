@@ -2,10 +2,10 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
+// necessary to remove the weird console window that appears alongside the real GUI on Windows
 #![windows_subsystem = "windows"]
 
 use std::{convert, process};
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::ops::DerefMut;
@@ -32,26 +32,19 @@ use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use warp::Filter;
 
-use crate::cli_args::CliArgs;
 use crate::config::v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
-use crate::device_status::DeviceStatus;
-use crate::exfiltrator::{ProtocolAttributesType, ServerDeviceIdentifier};
-use crate::extensions::FloatExtensions;
 use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
 use crate::gui::TaggedMotor;
-use crate::motor_settings::MotorSettings;
-use crate::watchdog::WatchdogTimeoutDb;
+use crate::structs::{CliArgs, DeviceStatus, MotorSettings};
+use crate::util::{update_checker, watchdog};
+use crate::util::exfiltrator::{ProtocolAttributesType, ServerDeviceIdentifier};
+use crate::util::extensions::FloatExtensions;
+use crate::util::watchdog::WatchdogTimeoutDb;
 
-mod cli_args;
 mod config;
-mod device_status;
-mod exfiltrator;
-mod extensions;
 mod gui;
-mod motor_settings;
-mod update_checker;
+mod structs;
 mod util;
-mod watchdog;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;
@@ -89,6 +82,9 @@ async fn tokio_main() {
     // run self-checks to make sure our unsafe hack to steal private fields appears to be working
     ServerDeviceIdentifier::test();
 
+    // grab our local version
+    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or_else(|e| panic!("Local version \"{}\" didn't follow semver! {}", env!("CARGO_PKG_VERSION"), e));
+
     if args.self_check {
         process::exit(0);
     }
@@ -123,42 +119,7 @@ async fn tokio_main() {
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).expect("Local version didn't follow semver!");
-    let update_url = match update_checker::check_for_update().await {
-        Ok(response) => {
-            info!("Update Url: {:?}", response.html_url);
-            info!("Update Version: {:?}", response.tag_name);
-            match Version::parse(&response.tag_name) {
-                Ok(remote_version) => {
-                    match remote_version.cmp(&local_version) {
-                        Ordering::Greater => {
-                            // we are behind
-                            info!("Local version is outdated.");
-                            Some(response.html_url)
-                        }
-                        Ordering::Less => {
-                            // we are NEWER than remote
-                            info!("Local version is NEWER than remote version!");
-                            None
-                        }
-                        Ordering::Equal => {
-                            // we are up to date
-                            info!("We are up to date.");
-                            None
-                        }
-                    }
-                }
-                Err(e) => {
-                    info!("Error parsing remote version: {e:?}");
-                    None
-                }
-            }
-        }
-        Err(e) => {
-            info!("Failed to get latest version info: {e:?}");
-            None
-        }
-    };
+    let update_url = update_checker::check_for_update(local_version).await;
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
@@ -314,7 +275,7 @@ async fn tokio_main() {
     }
 
     // at this point we begin cleaning up resources for shutdown
-    info!("shutting down...");
+    info!("shutting down…");
 
     // but first, wait for warp to close
     if let Err(e) = warp_shutdown_complete_rx.await {
@@ -359,7 +320,7 @@ async fn start_buttplug_server(
         .finish()
         .expect("Failed to initialize buttplug server");
 
-    /* We're allowed to steal a reference to this...
+    /* We're allowed to steal a reference to this…
      * and we're going to use it to get unique device IDs for duplicate device detection.
      * This is absolutely an evil hack but I have ZERO idea how else I'm supposed to do this
      * while using the ButtplugInProcessClientConnector, because the connector completely consumes
@@ -422,7 +383,7 @@ async fn start_buttplug_server(
                 };
             }
         }
-        Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly... ({e:?})") // will try to reconnect later, may not need to log this error
+        Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly… ({e:?})") // will try to reconnect later, may not need to log this error
     }
 }
 

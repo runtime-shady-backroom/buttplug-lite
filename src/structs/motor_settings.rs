@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use buttplug::core::message::ActuatorType;
 
+/// Desired settings for all the motors in a single device
 #[derive(Default)]
 pub struct MotorSettings {
     pub scalar_map: HashMap<u32, (f64, ActuatorType)>,

@@ -7,6 +7,7 @@ use std::ops::DerefMut;
 use std::path::PathBuf;
 
 use directories::ProjectDirs;
+use lazy_static::lazy_static;
 use tokio::sync::mpsc;
 use tokio::task;
 use tracing::{info, warn};

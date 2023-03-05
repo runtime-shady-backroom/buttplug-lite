@@ -2,6 +2,8 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
+//! A cursed contraption to steal private fields from structs
+
 use std::mem::size_of;
 
 use buttplug::server::device::configuration::ProtocolAttributesType as ButtplugProtocolAttributesType;
