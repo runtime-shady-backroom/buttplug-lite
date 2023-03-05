@@ -172,7 +172,7 @@ async fn tokio_main() {
     // test ticks
     let test_tick_sender = application_status_sender.clone();
     task::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut interval = tokio::time::interval(Duration::from_secs(1)); //TODO: turn this back to 30
         loop {
             interval.tick().await;
             test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FREAKING RECEIVER?");

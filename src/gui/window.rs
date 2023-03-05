@@ -192,6 +192,13 @@ impl Application for Gui {
                         if let Some(application_status) = application_status {
                             // we conduct the ol' switcharoo to move our old state into the new state without having to clone absolutely everything
                             if let Gui::Loaded(old_state) = std::mem::replace(self, Gui::Invalid) {
+
+                                //TODO: something in here nukes the status of motor tags that we're currently editing
+                                if old_state.motors != application_status.motors {
+                                    debug!("old motors = {:?}", old_state.motors);
+                                    debug!("new motors = {:?}", application_status.motors);
+                                }
+
                                 *self = Gui::Loaded(State {
                                     devices: application_status.devices,
                                     motors: application_status.motors,
@@ -213,6 +220,7 @@ impl Application for Gui {
                             panic!("Application was unexpectedly not in loaded state");
                         }
 
+                        debug!("Finished handling RefreshDevicesComplete event");
                         Command::none()
                     }
                     Message::SaveConfigurationRequest => {
