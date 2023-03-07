@@ -19,7 +19,7 @@ use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage, util};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
 use crate::gui::TokioExecutor;
-use crate::structs::DeviceStatus;
+use crate::app::structs::DeviceStatus;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: f32 = 75.0;
