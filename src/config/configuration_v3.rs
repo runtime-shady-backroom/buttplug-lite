@@ -188,16 +188,6 @@ impl Display for ActuatorType {
     }
 }
 
-impl MotorTypeV3 {
-    pub fn get_type(&self) -> Option<ButtplugDeviceMessageType> {
-        match self {
-            MotorTypeV3::Scalar { .. } => Some(ButtplugDeviceMessageType::ScalarCmd),
-            MotorTypeV3::Linear => Some(ButtplugDeviceMessageType::LinearCmd),
-            MotorTypeV3::Rotation => Some(ButtplugDeviceMessageType::RotateCmd),
-        }
-    }
-}
-
 impl Display for MotorTypeV3 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
