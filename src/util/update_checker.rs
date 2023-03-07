@@ -65,9 +65,9 @@ async fn get_latest_release() -> Result<GithubRelease, String> {
     let mut connector = TimeoutConnector::new(connector);
 
     // We wait for this to complete before we open the GUI, so we MUST have a short timeout.
-    connector.set_connect_timeout(Some(Duration::from_secs(3)));
-    connector.set_read_timeout(Some(Duration::from_secs(1)));
-    connector.set_write_timeout(Some(Duration::from_secs(1)));
+    connector.set_connect_timeout(Some(Duration::from_secs(10)));
+    connector.set_read_timeout(Some(Duration::from_secs(3)));
+    connector.set_write_timeout(Some(Duration::from_secs(3)));
 
     let client = Client::builder()
         .build::<_, Body>(connector);
