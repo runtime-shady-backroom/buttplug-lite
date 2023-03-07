@@ -2,65 +2,30 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use iced::{alignment::Alignment, Application, Color, Command, Element, Length, Settings, Subscription, Theme, theme};
-use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, text_input, TextInput};
+use iced::{alignment::Alignment, Application, Command, Element, Length, Settings, Subscription, Theme, theme};
+use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
 use iced_native::Event;
-use lazy_static::lazy_static;
 use semver::Version;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 
-use crate::{ApplicationStateDb, ShutdownMessage, util};
+use crate::{ApplicationStateDb, ShutdownMessage};
 use crate::app::buttplug;
 use crate::app::structs::{ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
+use crate::gui::constants::*;
+use crate::gui::structs::MotorMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
+use crate::gui::tagged_motor::TaggedMotor;
+use crate::gui::theme::THEME;
 use crate::gui::TokioExecutor;
+use crate::gui::util;
+use crate::util::slice as slice_util;
 use crate::util::update_checker;
-
-const TEXT_INPUT_PADDING: u16 = 5;
-const PORT_INPUT_WIDTH: f32 = 75.0;
-const TAG_INPUT_WIDTH: f32 = 100.0;
-const TABLE_SPACING: u16 = 20;
-const EOL_INPUT_SPACING: u16 = 5;
-const TEXT_SIZE_SMALL: u16 = 12;
-const TEXT_SIZE_DEFAULT: f32 = 20.0;
-const TEXT_SIZE_BIG: u16 = 30;
-
-const DARK_PALETTE: theme::Palette = theme::Palette {
-    background: Color::from_rgb(
-        0x36 as f32 / 255.0,
-        0x39 as f32 / 255.0,
-        0x3F as f32 / 255.0,
-    ),
-    text: Color::from_rgb(1.0, 1.0, 1.0),
-    primary: Color::from_rgb(
-        0x72 as f32 / 255.0,
-        0x89 as f32 / 255.0,
-        0xDA as f32 / 255.0,
-    ),
-    success: Color::from_rgb(
-        0x12 as f32 / 255.0,
-        0x66 as f32 / 255.0,
-        0x4F as f32 / 255.0,
-    ),
-    danger: Color::from_rgb(
-        0xC3 as f32 / 255.0,
-        0x42 as f32 / 255.0,
-        0x3F as f32 / 255.0,
-    ),
-};
-
-lazy_static! {
-    static ref THEME: Theme = Theme::custom(DARK_PALETTE);
-}
-
 
 pub fn run(
     application_state_db: ApplicationStateDb,
@@ -280,7 +245,7 @@ impl Application for Gui {
 
                         // find the duplicate indices
                         // note that this will leave one index from each group in the unique portion: we'll fix this later
-                        let split_point = util::slice::partition_dedup_by(&mut indices, |index_a, index_b| {
+                        let split_point = slice_util::partition_dedup_by(&mut indices, |index_a, index_b| {
                             if let Some(motor_a_tag) = override_tag_at_index(&state.motors, *index_a, motor_index, motor_message.tag()) {
                                 if let Some(motor_b_tag) = override_tag_at_index(&state.motors, *index_b, motor_index, motor_message.tag()) {
                                     motor_a_tag == motor_b_tag
@@ -398,7 +363,7 @@ impl Application for Gui {
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
                             .align_items(Alignment::Center)
-                            .push(input_label("Server port:"))
+                            .push(util::input_label("Server port:"))
                             .push(
                                 TextInput::new("server port", state.port_text.as_str(), Message::PortUpdated)
                                     .width(Length::Fixed(PORT_INPUT_WIDTH))
@@ -471,226 +436,10 @@ async fn gui_startup_action() -> StartupActionResult {
     StartupActionResult { update_check }
 }
 
-/// an optionally tagged motor
-#[derive(Clone, Debug)]
-pub struct TaggedMotor {
-    pub motor: MotorConfigurationV3,
-    state: TaggedMotorState,
-}
-
-impl PartialEq for TaggedMotor {
-    fn eq(&self, other: &Self) -> bool {
-        (&self.motor, &self.tag()) == (&other.motor, &other.tag())
-    }
-}
-
-impl Eq for TaggedMotor {}
-
-impl PartialOrd for TaggedMotor {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for TaggedMotor {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (&self.motor, &self.tag()).cmp(&(&other.motor, &other.tag()))
-    }
-}
-
-#[derive(Clone, Debug)]
-enum MotorMessage {
-    TagUpdated {
-        tag: String,
-        valid: bool,
-    },
-    TagDeleted,
-}
-
-impl MotorMessage {
-    fn tag(&self) -> Option<&str> {
-        match self {
-            MotorMessage::TagUpdated { tag, .. } => Some(tag),
-            MotorMessage::TagDeleted => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum TaggedMotorState {
-    Tagged {
-        tag: String,
-        valid: bool,
-    },
-    Untagged,
-}
-
-enum ElementAppearance {
-    Valid,
-    Invalid,
-}
-
-impl From<&TaggedMotorState> for ElementAppearance {
-    fn from(value: &TaggedMotorState) -> Self {
-        match value {
-            TaggedMotorState::Tagged { valid: false, .. } => ElementAppearance::Invalid,
-            _ => ElementAppearance::Valid,
-        }
-    }
-}
-
-impl text_input::StyleSheet for ElementAppearance {
-    type Style = Theme;
-
-    fn active(&self, style: &Self::Style) -> text_input::Appearance {
-        let palette = style.extended_palette();
-
-        let border_color = match self {
-            ElementAppearance::Invalid => palette.danger.strong.color,
-            _ => palette.background.strong.color,
-        };
-
-        text_input::Appearance {
-            background: palette.background.base.color.into(),
-            border_radius: 2.0,
-            border_width: 1.0,
-            border_color,
-        }
-    }
-
-    fn focused(&self, style: &Self::Style) -> text_input::Appearance {
-        let palette = style.extended_palette();
-
-        let border_color = match self {
-            ElementAppearance::Invalid => palette.danger.strong.color,
-            _ => palette.primary.strong.color,
-        };
-
-        text_input::Appearance {
-            background: palette.background.base.color.into(),
-            border_radius: 2.0,
-            border_width: 1.0,
-            border_color,
-        }
-    }
-
-    fn placeholder_color(&self, style: &Self::Style) -> Color {
-        let palette = style.extended_palette();
-
-        match self {
-            ElementAppearance::Invalid => palette.danger.strong.color,
-            _ => palette.background.strong.color,
-        }
-    }
-
-    fn value_color(&self, style: &Self::Style) -> Color {
-        let palette = style.extended_palette();
-
-        match self {
-            ElementAppearance::Invalid => palette.danger.base.text,
-            _ => palette.background.base.text,
-        }
-    }
-
-    fn selection_color(&self, style: &Self::Style) -> Color {
-        let palette = style.extended_palette();
-
-        match self {
-            ElementAppearance::Invalid => palette.danger.weak.color,
-            _ => palette.primary.weak.color,
-        }
-    }
-
-    fn hovered(&self, style: &Self::Style) -> text_input::Appearance {
-        let palette = style.extended_palette();
-
-        let border_color = match self {
-            ElementAppearance::Invalid => palette.danger.base.text,
-            _ => palette.background.base.text,
-        };
-
-        text_input::Appearance {
-            background: palette.background.base.color.into(),
-            border_radius: 2.0,
-            border_width: 1.0,
-            border_color,
-        }
-    }
-}
 
 impl Display for TaggedMotor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {:?}", self.motor, self.tag())
-    }
-}
-
-impl TaggedMotor {
-    pub fn new(motor: MotorConfigurationV3, tag: Option<String>) -> Self {
-        let state = match tag {
-            Some(tag) => TaggedMotorState::Tagged {
-                tag,
-                valid: true,
-            },
-            None => TaggedMotorState::Untagged,
-        };
-
-        TaggedMotor {
-            motor,
-            state,
-        }
-    }
-
-    fn tag(&self) -> Option<&str> {
-        match &self.state {
-            TaggedMotorState::Tagged { tag, .. } => Some(tag),
-            TaggedMotorState::Untagged => None
-        }
-    }
-
-    fn update(&mut self, message: MotorMessage) {
-        match message {
-            MotorMessage::TagUpdated { tag, valid } => {
-                if tag.is_empty() {
-                    self.state = TaggedMotorState::Untagged;
-                } else {
-                    self.state = TaggedMotorState::Tagged { tag, valid };
-                }
-            }
-            MotorMessage::TagDeleted => {
-                self.state = TaggedMotorState::Untagged;
-            }
-        }
-    }
-
-    fn view(&self) -> Element<MotorMessage> {
-        let row = Row::new()
-            .spacing(EOL_INPUT_SPACING)
-            .align_items(Alignment::Center)
-            .push(input_label(format!("{}", &self.motor)));
-
-        let row = match &self.state {
-            TaggedMotorState::Tagged { tag, valid } => {
-                row.push(
-                    TextInput::new("motor tag", tag, |text| MotorMessage::TagUpdated { tag: text, valid: *valid })
-                        .width(Length::Fixed(TAG_INPUT_WIDTH))
-                        .padding(TEXT_INPUT_PADDING)
-                        .style(theme::TextInput::Custom(Box::new(ElementAppearance::from(&self.state))))
-                )
-                    .push(
-                        Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
-                            .on_press(MotorMessage::TagDeleted)
-                    )
-            }
-            TaggedMotorState::Untagged => {
-                row.push(
-                    TextInput::new("motor tag", "", |text| MotorMessage::TagUpdated { tag: text, valid: true })
-                        .width(Length::Fixed(TAG_INPUT_WIDTH))
-                        .padding(TEXT_INPUT_PADDING)
-                )
-            }
-        };
-
-        row.into()
     }
 }
 
@@ -719,7 +468,7 @@ fn render_device_list(devices: &[DeviceStatus]) -> Element<Message> {
     } else {
         devices.iter()
             .fold(col, |column, device| {
-                column.push(input_label(format!("{device}")))
+                column.push(util::input_label(format!("{device}")))
             })
     };
     col.into()
@@ -751,14 +500,6 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
         })
         .collect::<Vec<_>>()
         .join(";")
-}
-
-fn input_label<'a, S: Into<Cow<'a, str>>, T: 'a>(label: S) -> Element<'a, T> {
-    let text = Text::new(label);
-
-    Container::new(text)
-        .padding(TEXT_INPUT_PADDING)
-        .into()
 }
 
 #[inline(always)]
