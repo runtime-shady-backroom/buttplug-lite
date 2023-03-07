@@ -714,7 +714,7 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
             motor.tag().map(|tag| match motor.motor.feature_type {
                 MotorTypeV3::Linear => format!("{tag}:20:0.5"),
                 MotorTypeV3::Rotation => format!("{tag}:-0.5"),
-                MotorTypeV3::Scalar { actuator_type: _ } => format!("{tag}:0.5"),
+                MotorTypeV3::Scalar { .. } => format!("{tag}:0.5"),
             })
         })
         .collect::<Vec<_>>()

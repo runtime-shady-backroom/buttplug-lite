@@ -346,7 +346,7 @@ async fn start_buttplug_server(
             // reuse old config, or load from disk if this is the initial connection
             let previous_state = application_state_mutex.deref_mut().take();
             let configuration = match previous_state {
-                Some(ApplicationState { configuration, client: _, device_manager: _ }) => configuration,
+                Some(ApplicationState { configuration, .. }) => configuration,
                 None => {
                     config::load_configuration().await
                 }
