@@ -5,53 +5,30 @@
 // necessary to remove the weird console window that appears alongside the real GUI on Windows
 #![windows_subsystem = "windows"]
 
-use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::process;
 use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
-use buttplug::client::{ButtplugClient, ButtplugClientDevice, ButtplugClientEvent};
-use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
-use buttplug::core::message::{ButtplugDeviceMessageType, ClientGenericDeviceMessageAttributes};
-use buttplug::server::ButtplugServerBuilder;
-use buttplug::server::device::hardware::communication::btleplug::BtlePlugCommunicationManagerBuilder;
-use buttplug::server::device::hardware::communication::lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder;
-use buttplug::server::device::hardware::communication::lovense_dongle::{LovenseHIDDongleCommunicationManagerBuilder, LovenseSerialDongleCommunicationManagerBuilder};
-use buttplug::server::device::hardware::communication::serialport::SerialPortCommunicationManagerBuilder;
-use buttplug::server::device::ServerDeviceManager;
 use clap::Parser;
-use futures::StreamExt;
 use semver::Version;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tokio::sync::oneshot::Sender;
 use tokio::task;
 use tracing::{info, warn};
-use tracing_subscriber::EnvFilter;
 
-use crate::app::structs::{ApplicationState, ApplicationStateDb, CliArgs, DeviceStatus};
+use crate::app::buttplug;
+use crate::app::structs::{ApplicationState, ApplicationStateDb, CliArgs};
 use crate::app::webserver::ShutdownMessage;
-use crate::config::v3::{ActuatorType, ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
-use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
-use crate::gui::TaggedMotor;
-use crate::util::{update_checker, watchdog};
-use crate::util::exfiltrator::{ProtocolAttributesType, ServerDeviceIdentifier};
+use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
+use crate::util::{logging, update_checker, watchdog};
+use crate::util::exfiltrator::ServerDeviceIdentifier;
 use crate::util::watchdog::WatchdogTimeoutDb;
 
 mod app;
 mod config;
 mod gui;
 mod util;
-
-// how long to wait before attempting a reconnect to the server
-const BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS: u64 = 5000;
-
-// name of this client from the buttplug.io server's perspective
-static BUTTPLUG_CLIENT_NAME: &str = "in-process-client";
-
-// log prefixes:
-static LOG_PREFIX_BUTTPLUG_SERVER: &str = "buttplug_server";
 
 fn main() {
     util::GLOBAL_TOKIO_RUNTIME.block_on(tokio_main())
@@ -70,33 +47,8 @@ async fn tokio_main() {
         process::exit(0);
     }
 
-    let log_filter = if let Some(log_filter_string) = args.log_filter {
-        // user is providing a custom filter and not using my verbosity presets at all
-        EnvFilter::try_new(log_filter_string).expect("failed to parse user-provided log filter")
-    } else if args.verbose == 0 {
-        // I get info, everything else gets warn
-        EnvFilter::try_new("warn,buttplug_lite=info").unwrap()
-    } else if args.verbose == 1 {
-        // my debug logging, buttplug's info logging, everything gets warn
-        EnvFilter::try_new("warn,buttplug=info,buttplug::server::device::server_device_manager_event_loop=warn,buttplug_derive=info,buttplug_lite=debug").unwrap()
-    } else if args.verbose == 2 {
-        // my + buttplug's debug logging, everything gets info
-        EnvFilter::try_new("info,buttplug=debug,buttplug_derive=debug,buttplug_lite=debug").unwrap()
-    } else if args.verbose == 3 {
-        // everything gets debug
-        EnvFilter::try_new("debug").unwrap()
-    } else {
-        // dear god everything gets trace
-        EnvFilter::try_new("trace").unwrap()
-    };
-
-    let _appender_guard = if args.stdout {
-        util::logging::init_console_logging(log_filter);
-        None
-    } else {
-        util::logging::try_init_file_logging(log_filter)
-    };
-    // now we can use tracing to log. Any tracing logs before this point go nowhere.
+    // after logging init we can use tracing to log. Any tracing logs before this point go nowhere.
+    logging::init(args.verbose, args.log_filter, args.stdout);
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
@@ -109,7 +61,6 @@ async fn tokio_main() {
 
     // used to send initial port over from the configuration load
     let (initial_config_loaded_tx, initial_config_loaded_rx) = oneshot::channel::<()>();
-    let mut initial_config_loaded_tx = Some(initial_config_loaded_tx);
     let (application_status_sender, application_status_receiver) = mpsc::unbounded_channel::<ApplicationStatusEvent>();
 
     // test ticks
@@ -124,20 +75,7 @@ async fn tokio_main() {
         });
     }
 
-    // connector clone moved into reconnect task
-    let reconnector_application_state_clone = application_state_db.clone();
-
-    // spawn the server reconnect task
-    // when the server is connected this functions as the event reader
-    // when the server is disconnected it attempts to reconnect after a delay
-    task::spawn(async move {
-        loop {
-            // we reconnect here regardless of server state
-            start_buttplug_server(reconnector_application_state_clone.clone(), initial_config_loaded_tx, application_status_sender.clone()).await; // will "block" until disconnect
-            initial_config_loaded_tx = None; // only Some() for the first loop
-            tokio::time::sleep(Duration::from_millis(BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
-        }
-    });
+    buttplug::start_server(application_state_db.clone(), initial_config_loaded_tx, application_status_sender).await;
 
     // use to shut down or restart the webserver
     let (warp_shutdown_initiate_tx, warp_shutdown_initiate_rx) = mpsc::unbounded_channel::<ShutdownMessage>();
@@ -160,9 +98,9 @@ async fn tokio_main() {
 
     if let Ok(()) = gui_start_rx.await {
         //TODO: wait for buttplug to notice devices
-        let initial_devices = get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
+        let initial_devices = buttplug::get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
-        let subscription = ApplicationStatusSubscriptionProvider::new(application_status_receiver);
+        let subscription = SubscriptionProvider::new(application_status_receiver);
         gui::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
@@ -188,261 +126,5 @@ async fn tokio_main() {
         if let Err(e) = application_state.client.disconnect().await {
             warn!("Unable to disconnect internal client from internal server: {e}");
         }
-    }
-}
-
-// start server, then while running process events
-// returns only when we disconnect from the server
-async fn start_buttplug_server(
-    application_state_db: ApplicationStateDb,
-    initial_config_loaded_tx: Option<Sender<()>>,
-    application_status_event_sender: mpsc::UnboundedSender<ApplicationStatusEvent>,
-) {
-    let mut application_state_mutex = application_state_db.write().await;
-    let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
-
-    let mut server_builder = ButtplugServerBuilder::default();
-    server_builder
-        .name("buttplug-lite")
-        .comm_manager(BtlePlugCommunicationManagerBuilder::default())
-        .comm_manager(SerialPortCommunicationManagerBuilder::default())
-        .comm_manager(LovenseHIDDongleCommunicationManagerBuilder::default())
-        .comm_manager(LovenseSerialDongleCommunicationManagerBuilder::default())
-        .comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default());
-
-    #[cfg(target_os = "windows")] {
-        use buttplug::server::device::hardware::communication::xinput::XInputDeviceCommunicationManagerBuilder;
-        server_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
-    }
-
-    let server = server_builder
-        .finish()
-        .expect("Failed to initialize buttplug server");
-
-    /* We're allowed to steal a reference to this…
-     * and we're going to use it to get unique device IDs for duplicate device detection.
-     * This is absolutely an evil hack but I have ZERO idea how else I'm supposed to do this
-     * while using the ButtplugInProcessClientConnector, because the connector completely consumes
-     * the ButtplugServer struct.
-     */
-    let device_manager = server.device_manager();
-
-    let connector = ButtplugInProcessClientConnectorBuilder::default()
-        .server(server)
-        .finish();
-
-    match buttplug_client.connect(connector).await {
-        Ok(()) => {
-            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: Device server started!");
-            let mut event_stream = buttplug_client.event_stream();
-            match buttplug_client.start_scanning().await {
-                Ok(()) => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: starting device scan"),
-                Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: scan failure: {e:?}")
-            };
-
-            // reuse old config, or load from disk if this is the initial connection
-            let previous_state = application_state_mutex.deref_mut().take();
-            let configuration = match previous_state {
-                Some(ApplicationState { configuration, .. }) => configuration,
-                None => {
-                    config::load_configuration().await
-                }
-            };
-
-            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration, device_manager: device_manager.clone() });
-            drop(application_state_mutex); // prevent this section from requiring two locks
-
-            if let Some(sender) = initial_config_loaded_tx {
-                sender.send(()).expect("failed to send config-loaded signal");
-            }
-
-            loop {
-                match event_stream.next().await {
-                    Some(event) => match event {
-                        ButtplugClientEvent::DeviceAdded(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}", debug_name_from_device(&dev, &device_manager));
-                            application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
-                        }
-                        ButtplugClientEvent::DeviceRemoved(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}", debug_name_from_device(&dev, &device_manager));
-                            application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
-                        }
-                        ButtplugClientEvent::PingTimeout => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: ping timeout"),
-                        ButtplugClientEvent::Error(e) => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server error: {e:?}"),
-                        ButtplugClientEvent::ScanningFinished => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device scan finished"),
-                        ButtplugClientEvent::ServerConnect => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server connected"),
-                        ButtplugClientEvent::ServerDisconnect => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server disconnected");
-                            let mut application_state_mutex = application_state_db.write().await;
-                            *application_state_mutex = None; // not strictly required but will give more sane error messages
-                            break;
-                        }
-                    },
-                    None => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: error reading haptic event")
-                };
-            }
-        }
-        Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly… ({e:?})") // will try to reconnect later, may not need to log this error
-    }
-}
-
-/// full list of all device information we could ever want
-#[derive(Clone, Debug)]
-pub struct ApplicationStatus {
-    pub motors: Vec<TaggedMotor>,
-    pub devices: Vec<DeviceStatus>,
-    pub configuration: ConfigurationV3,
-}
-
-pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Option<ApplicationStatus> {
-    let application_state_mutex = application_state_db.read().await;
-    match application_state_mutex.as_ref() {
-        Some(application_state) => {
-            let DeviceList { motors, mut devices } = get_devices(application_state).await;
-            let configuration = &application_state.configuration;
-            let tags = &configuration.tags;
-
-            // convert tags to TaggedMotor
-            let mut tagged_motors = motors_to_tagged(tags);
-
-            // for each device not yet in TaggedMotor, generate a new dummy TaggedMotor
-            let mut missing_motors: Vec<TaggedMotor> = motors.into_iter()
-                .filter(|motor| !tagged_motors.iter().any(|possible_match| &possible_match.motor == motor))
-                .map(|missing_motor| TaggedMotor::new(missing_motor, None))
-                .collect();
-
-            // merge results
-            tagged_motors.append(&mut missing_motors);
-
-            // sort the things
-            tagged_motors.sort_unstable();
-            devices.sort_unstable();
-
-            Some(ApplicationStatus {
-                motors: tagged_motors,
-                devices,
-                configuration: configuration.clone(),
-            })
-        }
-        None => None
-    }
-}
-
-fn motors_to_tagged(tags: &HashMap<String, MotorConfigurationV3>) -> Vec<TaggedMotor> {
-    tags.iter()
-        .map(|(tag, motor)| TaggedMotor::new(motor.clone(), Some(tag.clone())))
-        .collect()
-}
-
-/// intermediate struct used to return partially processed device info
-struct DeviceList {
-    motors: Vec<MotorConfigurationV3>,
-    devices: Vec<DeviceStatus>,
-}
-
-/// Get display name for device.
-#[inline(always)]
-fn display_name_from_device(device: &ButtplugClientDevice) -> String {
-    device.name().clone()
-    // once we want to handle duplicate devices:
-    //format!("{}#{}", device.name(), device.index())
-}
-
-/// Get unique identifier for a device. This should ALWAYS be the same for a given device.
-#[inline(always)]
-fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
-    let device_info = device_manager.device_info(device.index())?;
-    let buttplug_device_id = device_info.identifier();
-    let exfiltrated_device_id: ServerDeviceIdentifier = buttplug_device_id.clone().into();
-    Some(
-        match exfiltrated_device_id.attributes_identifier {
-            ProtocolAttributesType::Identifier(attributes_identifier) => format!("{}://{}/{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address, attributes_identifier),
-            ProtocolAttributesType::Default => format!("{}://{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address),
-        }
-    )
-}
-
-/// Get a full debug name for a device. This is intended for logging.
-fn debug_name_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> String {
-    let name = display_name_from_device(device);
-    match id_from_device(device, device_manager) {
-        Some(id) => format!("{name}@{id}"),
-        None => name,
-    }
-}
-
-fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
-    let mut motor_configuration_count: usize = 0;
-    for device in devices.iter() {
-        motor_configuration_count += device.message_attributes().scalar_cmd().as_ref().map_or(0, |v| v.len());
-        motor_configuration_count += device.message_attributes().rotate_cmd().as_ref().map_or(0, |v| v.len());
-        motor_configuration_count += device.message_attributes().linear_cmd().as_ref().map_or(0, |v| v.len());
-    }
-
-    let mut motor_configurations: Vec<MotorConfigurationV3> = Vec::with_capacity(motor_configuration_count);
-
-    let empty_vec = Vec::new();
-
-    for device in devices.into_iter() {
-        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
-        for index in 0..scalar_cmds.len() {
-            let message_attributes: &ClientGenericDeviceMessageAttributes = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
-            let actuator_type: ActuatorType = message_attributes.actuator_type().into();
-            let motor_config = MotorConfigurationV3 {
-                device_name: display_name_from_device(&device),
-                feature_type: MotorTypeV3::Scalar { actuator_type },
-                feature_index: index as u32,
-            };
-            motor_configurations.push(motor_config);
-        }
-
-        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
-        for index in 0..rotate_cmds.len() {
-            let motor_config = MotorConfigurationV3 {
-                device_name: display_name_from_device(&device),
-                feature_type: MotorTypeV3::Rotation,
-                feature_index: index as u32,
-            };
-            motor_configurations.push(motor_config);
-        }
-
-        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
-        for index in 0..linear_cmds.len() {
-            let motor_config = MotorConfigurationV3 {
-                device_name: display_name_from_device(&device),
-                feature_type: MotorTypeV3::Linear,
-                feature_index: index as u32,
-            };
-            motor_configurations.push(motor_config);
-        }
-    }
-
-    motor_configurations
-}
-
-async fn get_devices(application_state: &ApplicationState) -> DeviceList {
-    let devices = application_state.client.devices();
-    let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
-
-    for device in devices.iter() {
-        let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
-            device.battery_level().await.ok()
-        } else {
-            None
-        };
-        let rssi_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::RSSILevelCmd) {
-            device.rssi_level().await.ok()
-        } else {
-            None
-        };
-        let name: String = device.name().to_string();
-        device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
-    }
-
-    let motors = motor_configuration_from_devices(devices);
-
-    DeviceList {
-        motors,
-        devices: device_statuses,
     }
 }

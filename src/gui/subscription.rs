@@ -7,11 +7,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use futures::stream::Fuse;
 use futures::StreamExt;
+use iced_futures::MaybeSend;
 use iced_native::{Subscription, subscription};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-type Stream = Fuse<UnboundedReceiverStream<ApplicationStatusEvent>>;
+type Stream<T> = Fuse<UnboundedReceiverStream<T>>;
 
 struct Marker;
 
@@ -30,27 +31,29 @@ impl ApplicationStatusEvent {
     }
 }
 
-enum State {
-    Ready(Stream),
+enum State<T> {
+    Ready(Stream<T>),
     Error,
 }
 
-pub struct ApplicationStatusSubscriptionProvider {
-    stream: RefCell<Option<Stream>>,
+///
+/// `T` is the type of the event
+pub struct SubscriptionProvider<T> {
+    stream: RefCell<Option<Stream<T>>>,
 }
 
-impl ApplicationStatusSubscriptionProvider {
+impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
     pub fn new(
-        receiver: mpsc::UnboundedReceiver<ApplicationStatusEvent>) -> ApplicationStatusSubscriptionProvider
+        receiver: mpsc::UnboundedReceiver<T>) -> SubscriptionProvider<T>
     {
         let stream = UnboundedReceiverStream::new(receiver).fuse();
 
-        ApplicationStatusSubscriptionProvider {
+        SubscriptionProvider {
             stream: RefCell::new(Some(stream)),
         }
     }
 
-    pub fn subscribe(&self) -> Subscription<ApplicationStatusEvent> {
+    pub fn subscribe(&self) -> Subscription<T> {
         // initial state must be set up outside of the unfold, because we can't pass &self into the closure
         // if iced ever somehow initializes the unfold twice it'll put us in an invalid Error state.
         let initial_state = match self.stream.take() {

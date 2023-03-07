@@ -6,6 +6,7 @@
 
 use std::{fs, io};
 use std::path::{Path, PathBuf};
+
 use chrono::Local;
 use directories::ProjectDirs;
 use tracing::warn;
@@ -16,14 +17,43 @@ use tracing_subscriber::util::SubscriberInitExt;
 const MAXIMUM_LOG_FILES: usize = 50;
 static LOG_DIR_NAME: &str = "logs";
 
-pub fn init_console_logging(log_filter: EnvFilter) {
+pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool) -> Option<WorkerGuard> {
+    let log_filter = if let Some(log_filter_string) = log_filter {
+        // user is providing a custom filter and not using my verbosity presets at all
+        EnvFilter::try_new(log_filter_string).expect("failed to parse user-provided log filter")
+    } else if verbosity_level == 0 {
+        // I get info, everything else gets warn
+        EnvFilter::try_new("warn,buttplug_lite=info").unwrap()
+    } else if verbosity_level == 1 {
+        // my debug logging, buttplug's info logging, everything gets warn
+        EnvFilter::try_new("warn,buttplug=info,buttplug::server::device::server_device_manager_event_loop=warn,buttplug_derive=info,buttplug_lite=debug").unwrap()
+    } else if verbosity_level == 2 {
+        // my + buttplug's debug logging, everything gets info
+        EnvFilter::try_new("info,buttplug=debug,buttplug_derive=debug,buttplug_lite=debug").unwrap()
+    } else if verbosity_level == 3 {
+        // everything gets debug
+        EnvFilter::try_new("debug").unwrap()
+    } else {
+        // dear god everything gets trace
+        EnvFilter::try_new("trace").unwrap()
+    };
+
+    if use_stdout {
+        init_console_logging(log_filter);
+        None
+    } else {
+        try_init_file_logging(log_filter)
+    }
+}
+
+fn init_console_logging(log_filter: EnvFilter) {
     tracing_subscriber::fmt()
         .with_env_filter(log_filter)
         .finish()
         .init()
 }
 
-pub fn try_init_file_logging(log_filter: EnvFilter) -> Option<WorkerGuard> {
+fn try_init_file_logging(log_filter: EnvFilter) -> Option<WorkerGuard> {
     match create_log_dir_path() {
         Ok(log_dir_path) => {
             let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());

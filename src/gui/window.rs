@@ -15,11 +15,12 @@ use lazy_static::lazy_static;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 
-use crate::{ApplicationStateDb, ApplicationStatus, ShutdownMessage, util};
+use crate::{ApplicationStateDb, ShutdownMessage, util};
+use crate::app::buttplug;
+use crate::app::structs::{ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
-use crate::gui::subscription::{ApplicationStatusEvent, ApplicationStatusSubscriptionProvider};
+use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
 use crate::gui::TokioExecutor;
-use crate::app::structs::DeviceStatus;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: f32 = 75.0;
@@ -63,7 +64,7 @@ pub fn run(
     application_state_db: ApplicationStateDb,
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
     initial_devices: ApplicationStatus,
-    application_status_subscription: ApplicationStatusSubscriptionProvider,
+    application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
     update_url: Option<String>,
 ) {
     let settings = Settings {
@@ -95,7 +96,7 @@ struct Flags {
     warp_restart_tx: UnboundedSender<ShutdownMessage>,
     application_state_db: ApplicationStateDb,
     initial_application_status: ApplicationStatus,
-    application_status_subscription: ApplicationStatusSubscriptionProvider,
+    application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
     update_url: Option<String>,
 }
 
@@ -129,7 +130,7 @@ struct State {
     motor_tags_valid: bool,
     saving: bool,
     last_configuration: ConfigurationV3,
-    application_status_subscription: ApplicationStatusSubscriptionProvider,
+    application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
     update_url: Option<String>,
 }
 
@@ -694,7 +695,7 @@ fn render_device_list(devices: &[DeviceStatus]) -> Element<Message> {
 }
 
 async fn get_tagged_devices(application_state_db: ApplicationStateDb) -> Option<ApplicationStatus> {
-    crate::get_tagged_devices(&application_state_db).await
+    buttplug::get_tagged_devices(&application_state_db).await
 }
 
 async fn update_configuration(application_state_db: ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
