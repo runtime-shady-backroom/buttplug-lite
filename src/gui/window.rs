@@ -12,6 +12,7 @@ use iced::{alignment::Alignment, Application, Color, Command, Element, Length, S
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, text_input, TextInput};
 use iced_native::Event;
 use lazy_static::lazy_static;
+use semver::Version;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 
@@ -21,6 +22,7 @@ use crate::app::structs::{ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
 use crate::gui::TokioExecutor;
+use crate::util::update_checker;
 
 const TEXT_INPUT_PADDING: u16 = 5;
 const PORT_INPUT_WIDTH: f32 = 75.0;
@@ -65,7 +67,6 @@ pub fn run(
     warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
     initial_devices: ApplicationStatus,
     application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
-    update_url: Option<String>,
 ) {
     let settings = Settings {
         id: Some("buttplug-lite".to_string()),
@@ -75,7 +76,6 @@ pub fn run(
             application_state_db,
             initial_application_status: initial_devices,
             application_status_subscription,
-            update_url,
         },
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
@@ -97,7 +97,6 @@ struct Flags {
     application_state_db: ApplicationStateDb,
     initial_application_status: ApplicationStatus,
     application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
-    update_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,12 +110,20 @@ enum Message {
     NativeEventOccurred(Event),
     Tick,
     UpdateButtonPressed,
+    StartupActionCompleted(StartupActionResult)
 }
 
 enum Gui {
     /// intermediate state used for memory-fuckery reasons during transitions
     Invalid,
     Loaded(State),
+}
+
+#[derive(Debug, Clone)]
+enum UpdateCheck {
+    Uninitialized,
+    NoUpdateNeeded,
+    UpdateNeeded(String),
 }
 
 struct State {
@@ -131,7 +138,7 @@ struct State {
     saving: bool,
     last_configuration: ConfigurationV3,
     application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
-    update_url: Option<String>,
+    update_check: UpdateCheck,
 }
 
 impl Gui {
@@ -152,7 +159,7 @@ impl Gui {
             saving: false,
             last_configuration: configuration,
             application_status_subscription: flags.application_status_subscription,
-            update_url: flags.update_url,
+            update_check: UpdateCheck::Uninitialized,
         })
     }
 
@@ -172,7 +179,7 @@ impl Application for Gui {
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        (Gui::new(flags), Command::none())
+        (Gui::new(flags), Command::perform(gui_startup_action(), Message::StartupActionCompleted))
     }
 
     fn title(&self) -> String {
@@ -186,6 +193,10 @@ impl Application for Gui {
             }
             Gui::Loaded(state) => {
                 match message {
+                    Message::StartupActionCompleted(result) => {
+                        state.update_check = result.update_check;
+                        Command::none()
+                    }
                     Message::RefreshDevices => {
                         info!("device refresh triggered");
                         Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
@@ -213,7 +224,7 @@ impl Application for Gui {
                                     saving: old_state.saving,
                                     last_configuration: old_state.last_configuration,
                                     application_status_subscription: old_state.application_status_subscription,
-                                    update_url: old_state.update_url,
+                                    update_check: old_state.update_check,
                                 });
                             } else {
                                 // this should never happen
@@ -334,8 +345,12 @@ impl Application for Gui {
                         Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::UpdateButtonPressed => {
-                        let update_url: &str = state.update_url.as_ref().expect("Somehow pressed the update button without it visible!?").as_str();
-                        open::that(update_url).expect("Failed to open update URL");
+                        if let UpdateCheck::UpdateNeeded(update_url) = &state.update_check {
+                            open::that(update_url).expect("Failed to open update URL");
+                        } else {
+                            panic!("Somehow pressed the update button without it visible!?");
+                        }
+
                         Command::none()
                     }
                 }
@@ -370,7 +385,7 @@ impl Application for Gui {
                             let row = Row::new()
                                 .spacing(TABLE_SPACING)
                                 .push(save_button);
-                            if state.update_url.is_some() {
+                            if let UpdateCheck::UpdateNeeded(_) = state.update_check {
                                 row.push(
                                     Button::new(Text::new("Update Available!"))
                                         .on_press(Message::UpdateButtonPressed)
@@ -438,6 +453,22 @@ impl Application for Gui {
             Gui::Invalid => panic!("GUI was unexpectedly in an invalid state"),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct StartupActionResult {
+    update_check: UpdateCheck,
+}
+
+async fn gui_startup_action() -> StartupActionResult {
+    // grab our local version
+    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or_else(|e| panic!("Local version \"{}\" didn't follow semver! {}", env!("CARGO_PKG_VERSION"), e));
+    let update_url = update_checker::check_for_update(local_version).await;
+    let update_check = match update_url {
+        Some(update_url) => UpdateCheck::UpdateNeeded(update_url),
+        None => UpdateCheck::NoUpdateNeeded,
+    };
+    StartupActionResult { update_check }
 }
 
 /// an optionally tagged motor

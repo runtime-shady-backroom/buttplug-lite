@@ -7,7 +7,6 @@ use std::fmt::{Display, Formatter};
 use std::fmt;
 
 use buttplug::core::message::ActuatorType as ButtplugActuatorType;
-use buttplug::core::message::ButtplugDeviceMessageType;
 use serde::{Deserialize, Serialize};
 
 use crate::config::v2::{ConfigurationV2, MotorConfigurationV2, MotorTypeV2};

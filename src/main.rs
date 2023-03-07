@@ -12,7 +12,6 @@ use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
 use clap::Parser;
-use semver::Version;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::task;
 use tracing::{info, warn};
@@ -21,7 +20,7 @@ use crate::app::buttplug;
 use crate::app::structs::{ApplicationState, ApplicationStateDb, CliArgs};
 use crate::app::webserver::ShutdownMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
-use crate::util::{logging, update_checker, watchdog};
+use crate::util::{logging, watchdog};
 use crate::util::exfiltrator::ServerDeviceIdentifier;
 use crate::util::watchdog::WatchdogTimeoutDb;
 
@@ -40,9 +39,6 @@ async fn tokio_main() {
     // run self-checks to make sure our unsafe hack to steal private fields appears to be working
     ServerDeviceIdentifier::test();
 
-    // grab our local version
-    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or_else(|e| panic!("Local version \"{}\" didn't follow semver! {}", env!("CARGO_PKG_VERSION"), e));
-
     if args.self_check {
         process::exit(0);
     }
@@ -51,8 +47,6 @@ async fn tokio_main() {
     logging::init(args.verbose, args.log_filter, args.stdout);
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-
-    let update_url = update_checker::check_for_update(local_version).await;
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
@@ -101,7 +95,7 @@ async fn tokio_main() {
         let initial_devices = buttplug::get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
 
         let subscription = SubscriptionProvider::new(application_status_receiver);
-        gui::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription, update_url); // blocking call
+        gui::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.

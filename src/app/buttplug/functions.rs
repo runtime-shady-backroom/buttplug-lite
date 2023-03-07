@@ -1,3 +1,5 @@
+//! Various functions to work with buttplug devices
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
