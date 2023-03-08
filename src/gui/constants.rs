@@ -1,3 +1,7 @@
+// Copyright 2022 runtime-shady-backroom
+// This file is part of buttplug-lite.
+// buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
+
 pub const TEXT_INPUT_PADDING: u16 = 5;
 pub const PORT_INPUT_WIDTH: f32 = 75.0;
 pub const TAG_INPUT_WIDTH: f32 = 100.0;

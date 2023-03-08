@@ -1,3 +1,7 @@
+// Copyright 2022-2023 runtime-shady-backroom
+// This file is part of buttplug-lite.
+// buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
+
 //! The buttplug server startup code is so huge I'm putting it in its own file
 
 use std::ops::DerefMut;

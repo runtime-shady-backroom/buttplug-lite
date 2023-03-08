@@ -1,5 +1,7 @@
-// This is heavily inspired by https://github.com/rust-cli/human-panic
+// This file is heavily inspired by https://github.com/rust-cli/human-panic
 // human-panic is licensed under MIT OR Apache-2.0
+// Copyright 2018 human-panic Individual contributors
+// Copyright 2023 runtime-shady-backroom
 
 /// Handles custom panic hook and logging
 

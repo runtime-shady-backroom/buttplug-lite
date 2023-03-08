@@ -1,4 +1,4 @@
-// Copyright 2022 runtime-shady-backroom
+// Copyright 2022-2023 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 

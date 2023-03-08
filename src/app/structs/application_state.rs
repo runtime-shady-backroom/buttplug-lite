@@ -1,3 +1,7 @@
+// Copyright 2022-2023 runtime-shady-backroom
+// This file is part of buttplug-lite.
+// buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
+
 use std::sync::Arc;
 use buttplug::client::ButtplugClient;
 use buttplug::server::device::ServerDeviceManager;
