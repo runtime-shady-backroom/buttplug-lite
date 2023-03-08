@@ -4,9 +4,10 @@
 /// Handles custom panic hook and logging
 
 use std::{mem, panic, thread};
+use std::fmt::Write as FmtWrite;
+
 use backtrace::{Backtrace, BacktraceFrame};
 use tracing::error;
-use std::fmt::Write as FmtWrite;
 
 // We take padding for address and extra two letters to pad after index.
 const HEX_WIDTH: usize = mem::size_of::<usize>() + 2;
@@ -74,7 +75,7 @@ pub fn set_hook() {
                             );
                         }
                     }
-                },
+                }
             }
         }
 
@@ -96,7 +97,7 @@ fn should_skip(frame: &&BacktraceFrame) -> bool {
             } else {
                 false
             }
-        },
+        }
         _ => false
     }
 }
@@ -104,6 +105,7 @@ fn should_skip(frame: &&BacktraceFrame) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::util::logging;
+
     use super::*;
 
     #[test]
