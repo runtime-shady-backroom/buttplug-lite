@@ -48,6 +48,9 @@ async fn tokio_main() {
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
+    // set up custom panic handling
+    util::panic::set_hook();
+
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
 

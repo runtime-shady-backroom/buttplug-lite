@@ -16,6 +16,7 @@ categories = ["hardware-support", "web-programming::http-server", "web-programmi
 lto = "thin"
 
 [dependencies]
+backtrace = "0.3"
 buttplug = { version = "7", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
 bytes = "1"
 clap = { version = "4", features = ["derive"] }

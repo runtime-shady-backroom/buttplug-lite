@@ -46,6 +46,11 @@ pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool) -
     }
 }
 
+#[cfg(test)]
+pub fn init_console() {
+    init(1, None, true);
+}
+
 fn init_console_logging(log_filter: EnvFilter) {
     tracing_subscriber::fmt()
         .with_env_filter(log_filter)
