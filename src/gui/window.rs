@@ -218,6 +218,7 @@ impl Application for Gui {
                     }
                     Message::SaveConfigurationComplete(result) => {
                         state.saving = false;
+                        let application_state = state.application_state_db.clone();
                         match result {
                             Ok(configuration) => {
                                 state.last_configuration = configuration;
@@ -227,7 +228,10 @@ impl Application for Gui {
                                 warn!("save failed: {e:?}");
                             }
                         }
-                        Command::none()
+
+                        // trigger a motor refresh
+                        // this is needed because when we hit save we may have cleared old tags that no longer match any existing device
+                        Command::perform(get_tagged_devices(application_state), Message::RefreshDevicesComplete)
                     }
                     Message::PortUpdated(new_port) => {
                         state.port_text = new_port;

@@ -16,6 +16,8 @@ use warp::Filter;
 
 use crate::app::structs::{ApplicationStateDb, MotorSettings};
 use crate::app::webserver::shutdown_message::ShutdownMessage;
+use crate::app::webserver::structs::DeviceId;
+use crate::buttplug as app_buttplug;
 use crate::config::v3::{ConfigurationV3, MotorTypeV3};
 use crate::util::extensions::FloatExtensions;
 use crate::util::watchdog;
@@ -256,7 +258,16 @@ async fn haptic_handler(
             };
 
             for device in application_state.client.devices() {
-                if let Some(motor_settings) = device_map.remove(device.name()) {
+                let device_identifier = app_buttplug::id_from_device(&device, &application_state.device_manager);
+                let key = DeviceId {
+                    name: device.name().to_owned(),
+                    identifier: device_identifier,
+                };
+
+                let motor_settings = device_map.remove(&key)
+                    .or_else(|| device_map.remove(&key.without_identifier())); // fall back to no-id check in case of old configs
+
+                if let Some(motor_settings) = motor_settings {
                     let MotorSettings {
                         scalar_map,
                         rotate_map,
@@ -304,8 +315,8 @@ async fn haptic_handler(
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result<HashMap<String, MotorSettings>, String> {
-    let mut devices: HashMap<String, MotorSettings> = HashMap::new();
+fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result<HashMap<DeviceId, MotorSettings>, String> {
+    let mut devices: HashMap<DeviceId, MotorSettings> = HashMap::new();
 
     for line in command.split_terminator(';') {
         let mut split_line = line.split(':');
@@ -326,7 +337,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                             Err(e) => return Err(format!("could not parse motor intensity from {intensity}: {e:?}"))
                         };
 
-                        devices.entry(motor.device_name.clone())
+                        devices.entry(motor.into())
                             .or_insert_with(MotorSettings::default)
                             .scalar_map
                             .insert(motor.feature_index, (intensity, actuator_type.to_buttplug()));
@@ -350,7 +361,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                             Err(e) => return Err(format!("could not parse motor position from {position}: {e:?}"))
                         };
 
-                        devices.entry(motor.device_name.clone())
+                        devices.entry(motor.into())
                             .or_insert_with(MotorSettings::default)
                             .linear_map
                             .insert(motor.feature_index, (duration, position));
@@ -370,7 +381,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                             speed = -speed;
                         }
 
-                        devices.entry(motor.device_name.clone())
+                        devices.entry(motor.into())
                             .or_insert_with(MotorSettings::default)
                             .rotate_map
                             .insert(motor.feature_index, (speed, direction));

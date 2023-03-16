@@ -67,7 +67,7 @@ fn display_name_from_device(device: &ButtplugClientDevice) -> String {
 
 /// Get unique identifier for a device. This should ALWAYS be the same for a given device.
 #[inline(always)]
-fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
+pub fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
     let device_info = device_manager.device_info(device.index())?;
     let buttplug_device_id = device_info.identifier();
     let exfiltrated_device_id: ServerDeviceIdentifier = buttplug_device_id.clone().into();
@@ -88,7 +88,8 @@ pub fn debug_name_from_device(device: &ButtplugClientDevice, device_manager: &Se
     }
 }
 
-fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> Vec<MotorConfigurationV3> {
+/// get all distinct motors
+fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, device_manager: &ServerDeviceManager) -> Vec<MotorConfigurationV3> {
     let mut motor_configuration_count: usize = 0;
     for device in devices.iter() {
         motor_configuration_count += device.message_attributes().scalar_cmd().as_ref().map_or(0, |v| v.len());
@@ -107,6 +108,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
+                device_identifier: id_from_device(&device, device_manager),
                 feature_type: MotorTypeV3::Scalar { actuator_type },
                 feature_index: index as u32,
             };
@@ -117,6 +119,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         for index in 0..rotate_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
+                device_identifier: id_from_device(&device, device_manager),
                 feature_type: MotorTypeV3::Rotation,
                 feature_index: index as u32,
             };
@@ -127,6 +130,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>) -> 
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
+                device_identifier: id_from_device(&device, device_manager),
                 feature_type: MotorTypeV3::Linear,
                 feature_index: index as u32,
             };
@@ -156,7 +160,7 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
         device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
     }
 
-    let motors = motor_configuration_from_devices(devices);
+    let motors = motor_configuration_from_devices(devices, &application_state.device_manager);
 
     DeviceList {
         motors,

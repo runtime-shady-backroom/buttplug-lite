@@ -1,4 +1,4 @@
-// Copyright 2022 runtime-shady-backroom
+// Copyright 2022-2023 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -91,13 +91,18 @@ impl From<ConfigurationV2> for ConfigurationV3 {
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct MotorConfigurationV3 {
     pub device_name: String,
+    pub device_identifier: Option<String>,
     pub feature_index: u32,
     pub feature_type: MotorTypeV3,
 }
 
 impl Display for MotorConfigurationV3 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}#{}", self.device_name, self.feature_type, self.feature_index)
+        match &self.device_identifier {
+            Some(_identifier) => write!(f, "{} {}#{}", self.device_name, self.feature_type, self.feature_index),
+            None => write!(f, "{} {}#{} [LEGACY]", self.device_name, self.feature_type, self.feature_index),
+        }
+
     }
 }
 
@@ -107,6 +112,7 @@ impl TryFrom<MotorConfigurationV2> for MotorConfigurationV3 {
     fn try_from(config_v2: MotorConfigurationV2) -> Result<Self, Self::Error> {
         config_v2.feature_type.try_into().map(|type_v3| MotorConfigurationV3 {
             device_name: config_v2.device_name,
+            device_identifier: None,
             feature_type: type_v3,
             feature_index: config_v2.feature_index,
         })

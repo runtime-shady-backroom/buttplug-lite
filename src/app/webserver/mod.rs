@@ -8,3 +8,4 @@ pub use shutdown_message::ShutdownMessage;
 
 mod routes;
 mod shutdown_message;
+mod structs;
