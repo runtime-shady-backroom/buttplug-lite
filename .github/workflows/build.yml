@@ -29,8 +29,14 @@ jobs:
             path-separator: '/'
           - runs-on: macos-latest
             triple: x86_64-apple-darwin
-            build-name: macOS
+            build-name: macOS x64
             artifact-name: mac-x64
+            suffix: ''
+            path-separator: '/'
+          - runs-on: macos-latest
+            triple: aarch64-apple-darwin
+            build-name: macOS M1
+            artifact-name: mac-m1
             suffix: ''
             path-separator: '/'
       fail-fast: false
