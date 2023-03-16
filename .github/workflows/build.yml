@@ -21,24 +21,28 @@ jobs:
             artifact-name: windows
             suffix: .exe
             path-separator: '\'
+            runner-can-execute: true
           - runs-on: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
             build-name: Linux
             artifact-name: linux
             suffix: ''
             path-separator: '/'
+            runner-can-execute: true
           - runs-on: macos-latest
             triple: x86_64-apple-darwin
             build-name: macOS x86
             artifact-name: mac-x86
             suffix: ''
             path-separator: '/'
+            runner-can-execute: true
           - runs-on: macos-latest
             triple: aarch64-apple-darwin
             build-name: macOS M1
             artifact-name: mac-m1
             suffix: ''
             path-separator: '/'
+            runner-can-execute: false
       fail-fast: false
     name: Build ${{ matrix.target.build-name }}
     runs-on: ${{ matrix.target.runs-on }}
@@ -69,6 +73,7 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
       - name: Self-check
+        if: matrix.target.runner-can-execute
         run: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }} --self-check
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v3
