@@ -21,7 +21,7 @@ buttplug = { version = "7", default-features = false, features = ["tokio-runtime
 bytes = "1"
 clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # drop the "oldtime" feature
-directories = "4"
+directories = "5"
 futures = { version = "0.3", default-features = false }
 hyper = "0.14"
 hyper-timeout = "0.4"
