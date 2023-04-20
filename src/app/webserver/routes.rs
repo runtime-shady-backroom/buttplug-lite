@@ -109,7 +109,7 @@ pub fn start_webserver(
                         warp_future.await;
                     });
 
-                    // sacrifice main thread to shutdown trigger bullshit
+                    // sacrifice this thread to shutdown trigger bullshit
                     let signal = warp_shutdown_initiate_rx.recv().await.unwrap_or(ShutdownMessage::Shutdown);
                     warp_shutdown_oneshot_tx.send(()).expect("error transmitting warp shutdown signal");
                     signal
@@ -126,7 +126,7 @@ pub fn start_webserver(
             }
             // otherwise we go again
         }
-        warp_shutdown_complete_tx.send(()).expect("warp shut down, but could not transmit callback signal");
+        warp_shutdown_complete_tx.send(()).expect("warp shut down started, but could not transmit callback signal");
     });
 }
 

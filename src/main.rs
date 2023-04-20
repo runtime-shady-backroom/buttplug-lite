@@ -44,7 +44,7 @@ async fn tokio_main() {
     }
 
     // after logging init we can use tracing to log. Any tracing logs before this point go nowhere.
-    logging::init(args.verbose, args.log_filter, args.stdout);
+    let _log_guard = logging::init(args.verbose, args.log_filter, args.stdout);
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
@@ -113,7 +113,9 @@ async fn tokio_main() {
 
     // but first, wait for warp to close
     if let Err(e) = warp_shutdown_complete_rx.await {
-        info!("error shutting down warp: {e:?}")
+        info!("error shutting down warp webserver: {e:?}")
+    } else {
+        info!("initiated warp webserver graceful shutdown");
     }
 
     // it's be nice if I could shut down buttplug with `server.shutdown()`, but I'm forced to give server ownership to the connector
@@ -124,4 +126,6 @@ async fn tokio_main() {
             warn!("Unable to disconnect internal client from internal server: {e}");
         }
     }
+
+    info!("shutdown complete");
 }
