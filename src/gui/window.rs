@@ -369,7 +369,9 @@ impl Application for Gui {
                             .align_items(Alignment::Center)
                             .push(util::input_label("Server port:"))
                             .push(
-                                TextInput::new("server port", state.port_text.as_str(), Message::PortUpdated)
+                                TextInput::new("server port", state.port_text.as_str())
+                                    .on_input(Message::PortUpdated)
+                                    .on_paste(Message::PortUpdated)
                                     .width(Length::Fixed(PORT_INPUT_WIDTH))
                                     .padding(TEXT_INPUT_PADDING)
                             )

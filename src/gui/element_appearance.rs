@@ -22,6 +22,7 @@ impl From<&TaggedMotorState> for ElementAppearance {
     }
 }
 
+// check `theme.rs`'s `impl text_input::StyleSheet for Theme` for a reference implementation
 impl text_input::StyleSheet for ElementAppearance {
     type Style = Theme;
 
@@ -33,11 +34,17 @@ impl text_input::StyleSheet for ElementAppearance {
             _ => palette.background.strong.color,
         };
 
+        let icon_color = match self {
+            ElementAppearance::Invalid => palette.danger.weak.text,
+            _ => palette.background.weak.text,
+        };
+
         text_input::Appearance {
             background: palette.background.base.color.into(),
             border_radius: 2.0,
             border_width: 1.0,
             border_color,
+            icon_color,
         }
     }
 
@@ -49,11 +56,17 @@ impl text_input::StyleSheet for ElementAppearance {
             _ => palette.primary.strong.color,
         };
 
+        let icon_color = match self {
+            ElementAppearance::Invalid => palette.danger.weak.text,
+            _ => palette.background.weak.text,
+        };
+
         text_input::Appearance {
             background: palette.background.base.color.into(),
             border_radius: 2.0,
             border_width: 1.0,
             border_color,
+            icon_color,
         }
     }
 
@@ -75,6 +88,10 @@ impl text_input::StyleSheet for ElementAppearance {
         }
     }
 
+    fn disabled_color(&self, style: &Self::Style) -> Color {
+        self.placeholder_color(style)
+    }
+
     fn selection_color(&self, style: &Self::Style) -> Color {
         let palette = style.extended_palette();
 
@@ -92,11 +109,39 @@ impl text_input::StyleSheet for ElementAppearance {
             _ => palette.background.base.text,
         };
 
+        let icon_color = match self {
+            ElementAppearance::Invalid => palette.danger.weak.text,
+            _ => palette.background.weak.text,
+        };
+
         text_input::Appearance {
             background: palette.background.base.color.into(),
             border_radius: 2.0,
             border_width: 1.0,
             border_color,
+            icon_color,
+        }
+    }
+
+    fn disabled(&self, style: &Self::Style) -> text_input::Appearance {
+        let palette = style.extended_palette();
+
+        let border_color = match self {
+            ElementAppearance::Invalid => palette.danger.strong.color,
+            _ => palette.background.strong.color,
+        };
+
+        let icon_color = match self {
+            ElementAppearance::Invalid => palette.danger.strong.color,
+            _ => palette.background.strong.color,
+        };
+
+        text_input::Appearance {
+            background: palette.background.weak.color.into(),
+            border_radius: 2.0,
+            border_width: 1.0,
+            border_color,
+            icon_color,
         }
     }
 }

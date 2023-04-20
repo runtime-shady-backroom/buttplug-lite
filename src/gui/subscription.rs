@@ -70,7 +70,7 @@ impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
                         let event = stream
                             .select_next_some()
                             .await;
-                        (Some(event), State::Ready(stream))
+                        (event, State::Ready(stream))
                     }
                     State::Error => {
                         panic!("The subscription ended up in the error state")

@@ -87,7 +87,9 @@ impl TaggedMotor {
         let row = match &self.state {
             TaggedMotorState::Tagged { tag, valid } => {
                 row.push(
-                    TextInput::new("motor tag", tag, |text| MotorMessage::TagUpdated { tag: text, valid: *valid })
+                    TextInput::new("motor tag", tag)
+                        .on_input(|text| MotorMessage::TagUpdated { tag: text, valid: *valid })
+                        .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: *valid })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                         .style(theme::TextInput::Custom(Box::new(ElementAppearance::from(&self.state))))
@@ -99,7 +101,9 @@ impl TaggedMotor {
             }
             TaggedMotorState::Untagged => {
                 row.push(
-                    TextInput::new("motor tag", "", |text| MotorMessage::TagUpdated { tag: text, valid: true })
+                    TextInput::new("motor tag", "")
+                        .on_input(|text| MotorMessage::TagUpdated { tag: text, valid: true })
+                        .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: true })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                 )
