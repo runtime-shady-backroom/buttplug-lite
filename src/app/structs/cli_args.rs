@@ -28,7 +28,7 @@ pub struct CliArgs {
     #[arg(long, id = "SECONDS")]
     pub debug_ticks: Option<u64>,
 
-    /// Disables the custom panic handler. Possibly useful for debugging in conjunction with `--stdout`
+    /// Disables the custom panic handler in the log file. Has no effect if used with `--stdout`
     #[arg(long)]
     pub no_panic_handler: bool,
 }
