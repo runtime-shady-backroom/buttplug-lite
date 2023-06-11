@@ -27,4 +27,8 @@ pub struct CliArgs {
     /// Emit periodic ApplicationStatusEvent ticks every <SECONDS> seconds
     #[arg(long, id = "SECONDS")]
     pub debug_ticks: Option<u64>,
+
+    /// Disables the custom panic handler. Possibly useful for debugging in conjunction with `--stdout`
+    #[arg(long)]
+    pub no_panic_handler: bool,
 }

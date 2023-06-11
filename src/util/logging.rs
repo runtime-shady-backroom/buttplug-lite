@@ -14,18 +14,20 @@ use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use crate::util;
+
 const MAXIMUM_LOG_FILES: usize = 50;
 static LOG_DIR_NAME: &str = "logs";
 
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool) -> Option<WorkerGuard> {
+pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool, custom_panic_handler: bool) -> Option<WorkerGuard> {
     let log_filter = get_log_filter(verbosity_level, log_filter);
 
     if use_stdout {
         init_console_logging(log_filter);
         None
     } else {
-        try_init_file_logging(log_filter)
+        try_init_file_logging(log_filter, custom_panic_handler)
     }
 }
 
@@ -43,12 +45,19 @@ fn init_console_logging(log_filter: EnvFilter) {
 }
 
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-fn try_init_file_logging(log_filter: EnvFilter) -> Option<WorkerGuard> {
+fn try_init_file_logging(log_filter: EnvFilter, custom_panic_handler: bool) -> Option<WorkerGuard> {
     match create_log_dir_path() {
         Ok(log_dir_path) => {
             let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());
             let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
             init_file_logging(log_filter, non_blocking);
+
+            // Set up custom panic handling. This only really makes sense for file-based logging, as if you're using console
+            // you can just see the built in panic handling print things.
+            if custom_panic_handler {
+                util::panic::set_hook();
+            }
+
             Some(guard)
         }
         Err(e) => {

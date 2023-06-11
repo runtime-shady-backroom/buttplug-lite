@@ -44,12 +44,9 @@ async fn tokio_main() {
     }
 
     // after logging init we can use tracing to log. Any tracing logs before this point go nowhere.
-    let _log_guard = logging::init(args.verbose, args.log_filter, args.stdout);
+    let _log_guard = logging::init(args.verbose, args.log_filter, args.stdout, !args.no_panic_handler);
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-
-    // set up custom panic handling
-    util::panic::set_hook();
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));

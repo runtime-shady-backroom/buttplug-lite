@@ -1,6 +1,6 @@
 [package]
 name = "buttplug-lite"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["Runtime's Shady Backroom <76618880+runtime-shady-backroom@users.noreply.github.com>"]
 description = "Makes vibrators go brr"
 edition = "2021"
