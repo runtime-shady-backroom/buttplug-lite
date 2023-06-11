@@ -5,8 +5,7 @@
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use futures::stream::Fuse;
-use futures::StreamExt;
+use futures::stream::{Fuse, StreamExt};
 use iced_futures::MaybeSend;
 use iced_native::{Subscription, subscription};
 use tokio::sync::mpsc;
@@ -67,9 +66,11 @@ impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
             |state| async move {
                 match state {
                     State::Ready(mut stream) => {
-                        let event = stream
-                            .select_next_some()
-                            .await;
+                        let event: T = futures::select! {
+                            result = stream.select_next_some() => {
+                                result
+                            }
+                        };
                         (event, State::Ready(stream))
                     }
                     State::Error => {
