@@ -44,7 +44,13 @@ async fn tokio_main() {
     }
 
     // after logging init we can use tracing to log. Any tracing logs before this point go nowhere.
-    let _log_guard = logging::init(args.verbose, args.log_filter, args.stdout, !args.no_panic_handler);
+    let _log_guard = logging::init(
+        args.verbose,
+        args.log_filter,
+        args.stdout,
+        args.force_panic_handler,
+        !args.no_panic_handler
+    );
 
     info!("initializing {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 

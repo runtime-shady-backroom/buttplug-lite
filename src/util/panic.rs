@@ -119,7 +119,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn hooked_panic() {
-        logging::init_console();
+        logging::init_console(true);
         set_hook();
         panic!("hooked_panic");
 
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn hooked_unwrap() {
-        logging::init_console();
+        logging::init_console(true);
         set_hook();
         let empty: Option<&str> = None;
         empty.unwrap();
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn hooked_empty_panic() {
-        logging::init_console();
+        logging::init_console(true);
         set_hook();
         panic!();
     }

@@ -20,48 +20,54 @@ const MAXIMUM_LOG_FILES: usize = 50;
 static LOG_DIR_NAME: &str = "logs";
 
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool, custom_panic_handler: bool) -> Option<WorkerGuard> {
+pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool, stdout_custom_panic_handler: bool, file_custom_panic_handler: bool) -> Option<WorkerGuard> {
     let log_filter = get_log_filter(verbosity_level, log_filter);
 
     if use_stdout {
-        init_console_logging(log_filter);
+        init_console_logging(log_filter, stdout_custom_panic_handler);
         None
     } else {
-        try_init_file_logging(log_filter, custom_panic_handler)
+        try_init_file_logging(log_filter, stdout_custom_panic_handler, file_custom_panic_handler)
     }
 }
 
 #[cfg(test)]
-pub fn init_console() {
+pub fn init_console(custom_panic_handler: bool) {
     let log_filter = get_log_filter(1, None);
-    init_console_logging(log_filter);
+    init_console_logging(log_filter, custom_panic_handler);
 }
 
-fn init_console_logging(log_filter: EnvFilter) {
+fn init_console_logging(log_filter: EnvFilter, custom_panic_handler: bool) {
     tracing_subscriber::fmt()
         .with_env_filter(log_filter)
         .finish()
-        .init()
+        .init();
+
+    // Set up custom panic handling. By default we only use this for file-based logging,
+    // as if you're using console you can just see the built in panic handling print things.
+    if custom_panic_handler {
+        util::panic::set_hook();
+    }
 }
 
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-fn try_init_file_logging(log_filter: EnvFilter, custom_panic_handler: bool) -> Option<WorkerGuard> {
+fn try_init_file_logging(log_filter: EnvFilter, stdout_custom_panic_handler: bool, file_custom_panic_handler: bool) -> Option<WorkerGuard> {
     match create_log_dir_path() {
         Ok(log_dir_path) => {
             let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());
             let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
             init_file_logging(log_filter, non_blocking);
 
-            // Set up custom panic handling. This only really makes sense for file-based logging, as if you're using console
-            // you can just see the built in panic handling print things.
-            if custom_panic_handler {
+            // Set up custom panic handling. By default we only use this for file-based logging, as if you're using console
+            // as if you're using console you can just see the built in panic handling print things.
+            if file_custom_panic_handler {
                 util::panic::set_hook();
             }
 
             Some(guard)
         }
         Err(e) => {
-            init_console_logging(log_filter);
+            init_console_logging(log_filter, stdout_custom_panic_handler);
             warn!("File-based logging failed. Falling back to stdout: {e}");
             None
         }

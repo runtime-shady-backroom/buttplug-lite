@@ -162,10 +162,13 @@ buttplug-lite is intended to be used as a GUI, but for debugging purposes a few 
 Usage: buttplug-lite [OPTIONS]
 
 Options:
-  -v, --verbose...               Sets the level of verbosity
-  -c, --stdout                   Log to stdout instead of a log file
-  -f, --log-filter <LOG_FILTER>  Custom logging filter: https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/filter/struct.EnvFilter.html. This overrides `--verbose` setting
-      --self-check               Run self-checks then immediately exit
+  -v, --verbose...               Sets the level of verbosity. Repeating this argument up to four times will apply increasingly verbose log_filter presets
+  -c, --stdout                   Log to stdout instead of the default log file
+  -f, --log-filter <LOG_FILTER>  Custom logging filter: https://docs.rs/tracing-subscriber/0.3.16/tracing_subscriber/filter/struct.EnvFilter.html. This completely overrides the `--verbose` setting
+      --self-check               Run self-checks then immediately exit. This is for internal use and not designed for end users
+      --debug-ticks <SECONDS>    Emit periodic ApplicationStatusEvent ticks every <SECONDS> seconds. These "ticks" force the UI to update device state, which for example can be used to poll device battery levels
+      --no-panic-handler         Disables the custom panic handler in the log file. Has no effect if used with `--stdout`
+      --force-panic-handler      Enables the custom panic handler in stdout logs. Has no effect if file logging is used. Note that file logging is the default without an explicit `--stdout`
   -h, --help                     Print help
   -V, --version                  Print version
 ```
