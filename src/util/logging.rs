@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::Local;
 use directories::ProjectDirs;
-use tracing::warn;
+use tracing::{debug, info, warn};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -19,37 +19,35 @@ use crate::util;
 const MAXIMUM_LOG_FILES: usize = 50;
 static LOG_DIR_NAME: &str = "logs";
 
+/// Initialize logging framework
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-pub fn init(verbosity_level: u8, log_filter: Option<String>, use_stdout: bool, stdout_custom_panic_handler: bool, file_custom_panic_handler: bool) -> Option<WorkerGuard> {
+pub fn init(
+    verbosity_level: u8,
+    log_filter: Option<String>,
+    use_stdout: bool,
+    stdout_custom_panic_handler:
+    bool, file_custom_panic_handler: bool
+) -> Option<WorkerGuard> {
     let log_filter = get_log_filter(verbosity_level, log_filter);
 
     if use_stdout {
-        init_console_logging(log_filter, stdout_custom_panic_handler);
+        init_console_logging(log_filter);
+        set_panic_hook_and_log(stdout_custom_panic_handler);
         None
     } else {
         try_init_file_logging(log_filter, stdout_custom_panic_handler, file_custom_panic_handler)
     }
 }
 
+/// Initialize console logging for use in tests
 #[cfg(test)]
 pub fn init_console(custom_panic_handler: bool) {
     let log_filter = get_log_filter(1, None);
-    init_console_logging(log_filter, custom_panic_handler);
+    init_console_logging(log_filter);
+    set_panic_hook_and_log(custom_panic_handler);
 }
 
-fn init_console_logging(log_filter: EnvFilter, custom_panic_handler: bool) {
-    tracing_subscriber::fmt()
-        .with_env_filter(log_filter)
-        .finish()
-        .init();
-
-    // Set up custom panic handling. By default we only use this for file-based logging,
-    // as if you're using console you can just see the built in panic handling print things.
-    if custom_panic_handler {
-        util::panic::set_hook();
-    }
-}
-
+/// Attempt to log to a file, gracefully falling back to stdout logging on failure
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
 fn try_init_file_logging(log_filter: EnvFilter, stdout_custom_panic_handler: bool, file_custom_panic_handler: bool) -> Option<WorkerGuard> {
     match create_log_dir_path() {
@@ -57,23 +55,27 @@ fn try_init_file_logging(log_filter: EnvFilter, stdout_custom_panic_handler: boo
             let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());
             let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
             init_file_logging(log_filter, non_blocking);
-
-            // Set up custom panic handling. By default we only use this for file-based logging, as if you're using console
-            // as if you're using console you can just see the built in panic handling print things.
-            if file_custom_panic_handler {
-                util::panic::set_hook();
-            }
-
+            set_panic_hook_and_log(file_custom_panic_handler);
             Some(guard)
         }
         Err(e) => {
-            init_console_logging(log_filter, stdout_custom_panic_handler);
+            init_console_logging(log_filter);
+            set_panic_hook_and_log(stdout_custom_panic_handler);
             warn!("File-based logging failed. Falling back to stdout: {e}");
             None
         }
     }
 }
 
+/// Start logging framework for stdout
+fn init_console_logging(log_filter: EnvFilter) {
+    tracing_subscriber::fmt()
+        .with_env_filter(log_filter)
+        .finish()
+        .init();
+}
+
+/// Start logging framework for buffered file output
 fn init_file_logging(log_filter: EnvFilter, non_blocking: NonBlocking) {
     tracing_subscriber::fmt()
         .with_ansi(false)
@@ -83,6 +85,18 @@ fn init_file_logging(log_filter: EnvFilter, non_blocking: NonBlocking) {
         .init();
 }
 
+/// Set up custom panic handling. By default we only use this for file-based logging,
+/// as if you're using console you can just see the built in panic handling print things.
+fn set_panic_hook_and_log(custom_panic_handler: bool) {
+    if custom_panic_handler {
+        debug!("Setting up custom panic hook...");
+        util::panic::set_hook();
+    } else {
+        info!("NOT using custom panic hook!");
+    }
+}
+
+/// Get the appropriate log filter for the configured verbosity
 fn get_log_filter(verbosity_level: u8, log_filter: Option<String>) -> EnvFilter {
     if let Some(log_filter_string) = log_filter {
         // user is providing a custom filter and not using my verbosity presets at all
@@ -106,6 +120,7 @@ fn get_log_filter(verbosity_level: u8, log_filter: Option<String>) -> EnvFilter 
 }
 
 fn get_log_file_name() -> String {
+    //TODO: this will cause problems if you launch the program twice in the same second...
     Local::now().format("%Y-%m-%d_%H-%M-%S.log").to_string()
 }
 
@@ -125,6 +140,7 @@ fn create_log_dir_path() -> io::Result<PathBuf> {
     Ok(log_dir_path)
 }
 
+/// Delete oldest logs, retaining up to `MAXIMUM_LOG_FILES` files in the directory
 fn clean_up_old_logs(path: &Path) -> io::Result<()> {
     let mut paths = Vec::new();
     for entry in fs::read_dir(path)? {
