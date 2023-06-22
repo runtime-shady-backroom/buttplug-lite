@@ -13,32 +13,32 @@ keywords = ["vibrator", "buttplug", "control", "bluetooth", "websocket"]
 categories = ["hardware-support", "web-programming::http-server", "web-programming::websocket"]
 
 [profile.release]
-lto = "thin"
+lto = "thin" # "fat" made build times extremely slow, so using "thin" as a good compromise. See https://doc.rust-lang.org/cargo/reference/profiles.html#lto
 
 [dependencies]
-backtrace = "0.3"
-buttplug = { version = "7", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # uses tokio 1
-bytes = "1"
-clap = { version = "4", features = ["derive"] }
-chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # drop the "oldtime" feature
-directories = "5"
-futures = { version = "0.3", default-features = false }
-hyper = "0.14"
-hyper-timeout = "0.4"
-hyper-tls = "0.5"
-iced = "0.9"
-iced_futures = "0.6"
-iced_native = "0.10"
-itertools = "0.10"
-lazy_static = "1"
-open = "4"
-semver = "1"
-serde = "1"
-serde_json = "1"
-tokio = { version = "1", features = ["full"] }
-tokio-stream = "0.1"
-toml = "0.7"
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-warp = "0.3" # uses tokio 1
+backtrace = "0.3" # Used by custom panic handler
+buttplug = { version = "7", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # Used to connect to buttplugs
+bytes = "1" # Needed to asynchronously read hyper response bodies
+clap = { version = "4", features = ["derive"] } # Provides command line argument functionality
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # Used to generated timestamp strings for log filenames. Weird features are to intentionally drop the deprecated "oldtime" feature
+directories = "5" # Used to get OS-specific directories for storing application files (logs, configs, etc).
+futures = { version = "0.3", default-features = false } # Necessary for working with async results.
+hyper = "0.14" # HTTP client used by the update checker
+hyper-timeout = "0.4" # Enables the application update checker to timeout
+hyper-tls = "0.5" # Enables the application update checker to handle HTTPS
+iced = "0.9" # Provides the GUI
+iced_futures = "0.6" # Needed by iced
+iced_native = "0.10" # Needed by iced
+itertools = "0.10" # Used for duplicate detection in a Vec
+lazy_static = "1" # Used to initialize globals at runtime
+open = "4" # Used to open application update pages in your browser
+semver = "1" # Used for application update checking
+serde = "1" # The (de)serialization library
+serde_json = "1" # Used to deserialize GitHub API responses (used by application update checker)
+tokio = { version = "1", features = ["full"] } # Async runtime
+tokio-stream = "0.1" # Used in my iced subscription implementation
+toml = "0.7" # Used for configuration file (de)serialization
+tracing = "0.1" # Used for logging
+tracing-appender = "0.2" # Used for logging
+tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Used for logging
+warp = "0.3" # Provides the web server

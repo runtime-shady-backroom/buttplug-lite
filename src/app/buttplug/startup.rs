@@ -4,7 +4,7 @@
 
 //! The buttplug server startup code is so huge I'm putting it in its own file
 
-use std::ops::DerefMut;
+use std::ops::DerefMut as _;
 use std::time::Duration;
 
 use buttplug::client::{ButtplugClient, ButtplugClientEvent};
@@ -17,7 +17,7 @@ use buttplug::server::device::hardware::communication::{
     lovense_dongle::LovenseSerialDongleCommunicationManagerBuilder,
     serialport::SerialPortCommunicationManagerBuilder,
 };
-use futures::StreamExt;
+use futures::StreamExt as _;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use tracing::{info, warn};

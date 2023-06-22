@@ -3,7 +3,7 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::{convert, fs};
-use std::ops::DerefMut;
+use std::ops::DerefMut as _;
 use std::path::PathBuf;
 
 use directories::ProjectDirs;

@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 
 use buttplug::client::{LinearCommand, RotateCommand, ScalarCommand};
 use buttplug::core::message::ButtplugDeviceMessageType;
-use futures::StreamExt;
+use futures::StreamExt as _;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use tracing::{debug, error, info, warn};
@@ -19,7 +19,7 @@ use crate::app::webserver::shutdown_message::ShutdownMessage;
 use crate::app::webserver::structs::DeviceId;
 use crate::buttplug as app_buttplug;
 use crate::config::v3::{ConfigurationV3, MotorTypeV3};
-use crate::util::extensions::FloatExtensions;
+use crate::util::extensions::FloatExtensions as _;
 use crate::util::watchdog;
 use crate::util::watchdog::WatchdogTimeoutDb;
 

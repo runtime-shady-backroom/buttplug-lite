@@ -2,8 +2,8 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use std::convert::TryFrom;
-use std::ops::Add;
+use std::convert::TryFrom as _;
+use std::ops::Add as _;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, UNIX_EPOCH};

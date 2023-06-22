@@ -12,7 +12,7 @@ use directories::ProjectDirs;
 use tracing::{debug, info, warn};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::util::SubscriberInitExt as _;
 
 use crate::util;
 

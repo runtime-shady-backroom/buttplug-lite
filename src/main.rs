@@ -5,7 +5,7 @@
 // necessary to remove the weird console window that appears alongside the real GUI on Windows
 #![windows_subsystem = "windows"]
 
-use std::ops::DerefMut;
+use std::ops::DerefMut as _;
 use std::process;
 use std::sync::Arc;
 use std::sync::atomic::AtomicI64;

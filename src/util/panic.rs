@@ -6,7 +6,7 @@
 /// Handles custom panic hook and logging
 
 use std::{mem, panic, thread};
-use std::fmt::Write as FmtWrite;
+use std::fmt::Write as _;
 
 use backtrace::{Backtrace, BacktraceFrame};
 use tracing::error;

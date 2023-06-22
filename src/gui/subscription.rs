@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use futures::stream::{Fuse, StreamExt};
+use futures::stream::{Fuse, StreamExt as _};
 use iced_futures::MaybeSend;
 use iced_native::{Subscription, subscription};
 use tokio::sync::mpsc;
