@@ -38,7 +38,7 @@ jobs:
             runner-can-execute: true
           - runs-on: macos-latest
             triple: aarch64-apple-darwin
-            build-name: macOS M1
+            build-name: macOS ARM
             artifact-name: mac-arm
             suffix: ''
             path-separator: '/'
