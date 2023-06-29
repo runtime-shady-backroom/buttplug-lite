@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
-use clap::Parser;
+use clap::Parser as _;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::task;
 use tracing::{info, warn};
