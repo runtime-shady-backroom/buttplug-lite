@@ -37,7 +37,7 @@ serde = "1" # The (de)serialization library
 serde_json = "1" # Used to deserialize GitHub API responses (used by application update checker)
 tokio = { version = "1", features = ["full"] } # Async runtime
 tokio-stream = "0.1" # Used in my iced subscription implementation
-toml = "0.7" # Used for configuration file (de)serialization
+toml = "0.8" # Used for configuration file (de)serialization
 tracing = "0.1" # Used for logging
 tracing-appender = "0.2" # Used for logging
 tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Used for logging
