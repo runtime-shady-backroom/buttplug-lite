@@ -46,8 +46,6 @@ pub fn run(
         default_text_size: TEXT_SIZE_DEFAULT,
         antialiasing: true,
         exit_on_close_request: false,
-        text_multithreading: false,
-        try_opengles_first: false,
     };
 
     Gui::run(settings).expect("could not instantiate window");

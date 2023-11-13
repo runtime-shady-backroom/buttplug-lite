@@ -41,7 +41,7 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0,
+            border_radius: 2.0.into(),
             border_width: 1.0,
             border_color,
             icon_color,
@@ -63,7 +63,7 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0,
+            border_radius: 2.0.into(),
             border_width: 1.0,
             border_color,
             icon_color,
@@ -116,7 +116,7 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0,
+            border_radius: 2.0.into(),
             border_width: 1.0,
             border_color,
             icon_color,
@@ -138,7 +138,7 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.weak.color.into(),
-            border_radius: 2.0,
+            border_radius: 2.0.into(),
             border_width: 1.0,
             border_color,
             icon_color,
