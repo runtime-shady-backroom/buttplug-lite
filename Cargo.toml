@@ -26,8 +26,8 @@ futures = { version = "0.3", default-features = false } # Necessary for working 
 hyper = "0.14" # HTTP client used by the update checker
 hyper-timeout = "0.4" # Enables the application update checker to timeout
 hyper-tls = "0.5" # Enables the application update checker to handle HTTPS
-iced = "0.9" # Provides the GUI
-iced_futures = "0.6" # Needed by iced
+iced = "0.10" # Provides the GUI
+iced_futures = "0.7" # Needed by iced
 iced_native = "0.10" # Needed by iced
 itertools = "0.12" # Used for duplicate detection in a Vec
 lazy_static = "1" # Used to initialize globals at runtime
