@@ -6,7 +6,7 @@ use clap::Parser;
 
 /// struct used to derive Clap arguments
 #[derive(Parser)]
-#[command(author = "runtime", version, about, long_about = None)]
+#[command(author = "runtime", version = env!("CLAP_VERSION"), about, long_about = None)]
 pub struct CliArgs {
     /// Sets the level of verbosity. Repeating this argument up to four times will apply increasingly verbose log_filter presets.
     #[arg(short = 'v', long, action = clap::ArgAction::Count)]
