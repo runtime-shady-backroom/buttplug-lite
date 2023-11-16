@@ -23,7 +23,7 @@ clap = { version = "4", features = ["derive"] } # Provides command line argument
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # Used to generated timestamp strings for log filenames. Weird features are to intentionally drop the deprecated "oldtime" feature
 directories = "5" # Used to get OS-specific directories for storing application files (logs, configs, etc).
 futures = { version = "0.3", default-features = false } # Necessary for working with async results.
-hyper = "0.14" # HTTP client used by the update checker
+hyper = "1" # HTTP client used by the update checker
 hyper-timeout = "0.4" # Enables the application update checker to timeout
 hyper-tls = "0.5" # Enables the application update checker to handle HTTPS
 iced = "0.10" # Provides the GUI
