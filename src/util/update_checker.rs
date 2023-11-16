@@ -6,6 +6,7 @@
 
 use std::cmp::Ordering;
 use std::time::Duration;
+use reqwest::header;
 
 use semver::Version;
 use serde::Deserialize;
@@ -57,22 +58,36 @@ pub async fn check_for_update(local_version: Version) -> Option<String> {
 /// Get latest release from GitHub
 async fn get_latest_release() -> Result<GithubRelease, String> {
     let client = reqwest::Client::builder()
+        .gzip(true)
+        .http2_prior_knowledge()
+        .https_only(true)
+        .user_agent(USER_AGENT)
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(3))
+        .connection_verbose(true)
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
     let request = client.get(UPDATE_CHECK_URI)
-        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .header(header::ACCEPT, "application/json")
         .build()
         .map_err(|e| format!("Failed to build update check HTTP request: {e}"))?;
 
     let response = client.execute(request).await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // note that this buffers the entire JSON response before it begins parsing
+    // Note that this buffers the entire JSON response before it begins parsing.
+    //
+    // This is honestly fine for a few reasons:
+    // 1. The response body is only like 2kb, and it won't get larger over time.
+    // 2. serde_json doesn't have great tech for streaming over response data
+    // 3. using a Reader on some sort of response data buffer involves copies
+    // 4. we do this a grand total of once and it's in the background
+    //
+    // If I really care about optimizing this, the _real_ target would be to implement etag-based caching.
+    let status = response.status();
     response.json::<GithubRelease>().await
-        .map_err(|e| format!("error parsing github release response body: {e}"))
+        .map_err(|e| format!("error parsing github release {} response: {}", status.as_str(), e))
 }
 
 /// GitHub API response object
