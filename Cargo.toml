@@ -18,19 +18,16 @@ lto = "thin" # "fat" made build times extremely slow, so using "thin" as a good 
 [dependencies]
 backtrace = "0.3" # Used by custom panic handler
 buttplug = { version = "7", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # Used to connect to buttplugs
-bytes = "1" # Needed to asynchronously read hyper response bodies
-clap = { version = "4", features = ["derive"] } # Provides command line argument functionality
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # Used to generated timestamp strings for log filenames. Weird features are to intentionally drop the deprecated "oldtime" feature
+clap = { version = "4", features = ["derive"] } # Provides command line argument functionality
 directories = "5" # Used to get OS-specific directories for storing application files (logs, configs, etc).
 futures = { version = "0.3", default-features = false } # Necessary for working with async results.
-hyper = "1" # HTTP client used by the update checker
-hyper-timeout = "0.4" # Enables the application update checker to timeout
-hyper-tls = "0.5" # Enables the application update checker to handle HTTPS
 iced = "0.10" # Provides the GUI
 iced_futures = "0.7" # Needed by iced
 itertools = "0.12" # Used for duplicate detection in a Vec
 lazy_static = "1" # Used to initialize globals at runtime
 open = "5" # Used to open application update pages in your browser
+reqwest = { version = "0.11", features = ["gzip", "json"] } # HTTP client used by the update checker
 semver = "1" # Used for application update checking
 serde = "1" # The (de)serialization library
 serde_json = "1" # Used to deserialize GitHub API responses (used by application update checker)
