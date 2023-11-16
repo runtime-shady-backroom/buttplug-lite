@@ -6,9 +6,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use iced::{alignment::Alignment, Application, Command, Element, Length, Settings, Subscription, Theme, theme};
+use iced::{alignment::Alignment, Application, Command, Element, Event, Length, Settings, Subscription, Theme, theme};
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
-use iced_native::Event;
 use semver::Version;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
@@ -51,7 +50,7 @@ pub fn run(
     Gui::run(settings).expect("could not instantiate window");
     match warp_shutdown_tx.send(ShutdownMessage::Shutdown) {
         Ok(()) => info!("shutdown triggered by UI close"),
-        Err(e) => panic!("Error triggering shutdown: {e}")
+        Err(e) => panic!("Error triggering shutdown: {}", e)
     };
 }
 
@@ -300,7 +299,7 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::NativeEventOccurred(event) => {
-                        if let Event::Window(iced_native::window::Event::CloseRequested) = event {
+                        if let Event::Window(iced::window::Event::CloseRequested) = event {
                             info!("received gui shutdown request");
                             iced::window::close()
                         } else {
@@ -406,7 +405,7 @@ impl Application for Gui {
 
     // this is called many times in strange and mysterious ways
     fn subscription(&self) -> Subscription<Message> {
-        let native_events = iced_native::subscription::events()
+        let native_events = iced::subscription::events()
             .map(Message::NativeEventOccurred);
 
         match self {

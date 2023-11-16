@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use futures::stream::{Fuse, StreamExt as _};
+use iced::{Subscription, subscription};
 use iced_futures::MaybeSend;
-use iced_native::{Subscription, subscription};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
