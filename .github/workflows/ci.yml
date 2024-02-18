@@ -75,9 +75,9 @@ jobs:
           target: ${{ matrix.target.triple }}
       - name: Install extra Linux dependencies
         if: matrix.target.runs-on == 'ubuntu-latest'
-        run: | # gdk-sys needs {libgtk-3-dev}.
+        run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev
+          run: sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev # libdbus-sys needs {ibdbus-1-dev, pkg-config}. libudev-sys needs {libudev-dev}
       - name: Check
         run: cargo check --target ${{ matrix.target.triple }}
       - name: Test
