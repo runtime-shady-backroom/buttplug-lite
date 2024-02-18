@@ -77,7 +77,7 @@ jobs:
         if: matrix.target.runs-on == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          run: sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev # libdbus-sys needs {ibdbus-1-dev, pkg-config}. libudev-sys needs {libudev-dev}
+          sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev # libdbus-sys needs {ibdbus-1-dev, pkg-config}. libudev-sys needs {libudev-dev}
       - name: Check
         run: cargo check --target ${{ matrix.target.triple }}
       - name: Test
