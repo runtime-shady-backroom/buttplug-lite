@@ -86,7 +86,7 @@ jobs:
         if: matrix.target.runner-can-execute
         run: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }} --self-check
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: buttplug-lite-${{ matrix.target.triple }}
           path: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
