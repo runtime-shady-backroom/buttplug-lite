@@ -10,7 +10,6 @@ use std::time::Duration;
 use buttplug::client::{ButtplugClient, ButtplugClientEvent};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
 use buttplug::server::ButtplugServerBuilder;
-use buttplug::server::device::configuration::DeviceConfigurationManagerBuilder;
 use buttplug::server::device::hardware::communication::{
     btleplug::BtlePlugCommunicationManagerBuilder,
     lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder,
@@ -69,10 +68,11 @@ async fn start_server_internal(
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
     // buttplug::util::in_process_client has a good example of how to do this, and so does https://github.com/buttplugio/docs.buttplug.io/blob/master/examples/rust/src/bin/embedded_connector.rs
-    let device_configuration_manager = DeviceConfigurationManagerBuilder::default()
+    let mut device_configuration_manager_builder = buttplug::util::device_configuration::load_protocol_configs(&None, &None, false).expect("Failed to load protocol configs");
+    let device_configuration_manager = device_configuration_manager_builder
         .allow_raw_messages(false)
         .finish()
-        .unwrap();
+        .expect("Failed to build device configuration manager");
     let mut device_manager_builder = ServerDeviceManagerBuilder::new(device_configuration_manager);
     device_manager_builder
         .comm_manager(BtlePlugCommunicationManagerBuilder::default())
@@ -86,7 +86,7 @@ async fn start_server_internal(
         device_manager_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
     }
 
-    let server = ButtplugServerBuilder::new(device_manager_builder.finish().unwrap())
+    let server = ButtplugServerBuilder::new(device_manager_builder.finish().expect("Failed to build device manager"))
         .name("buttplug-lite")
         .finish()
         .expect("Failed to initialize buttplug server");
