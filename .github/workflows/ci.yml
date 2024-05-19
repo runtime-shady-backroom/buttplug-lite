@@ -83,6 +83,3 @@ jobs:
       - name: Test
         if: matrix.target.runner-can-execute
         run: cargo test --target ${{ matrix.target.triple }}
-      - name: Self-check
-        if: matrix.target.runner-can-execute
-        run: cargo run -- --self-check

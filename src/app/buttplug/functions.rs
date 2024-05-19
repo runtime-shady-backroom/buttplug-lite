@@ -15,7 +15,6 @@ use crate::app::buttplug::structs::DeviceList;
 use crate::app::structs::{ApplicationState, ApplicationStateDb, ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ActuatorType, MotorConfigurationV3, MotorTypeV3};
 use crate::gui::TaggedMotor;
-use crate::util::exfiltrator::{ProtocolAttributesType, ServerDeviceIdentifier};
 
 pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Option<ApplicationStatus> {
     let application_state_mutex = application_state_db.read().await;
@@ -69,12 +68,11 @@ fn display_name_from_device(device: &ButtplugClientDevice) -> String {
 #[inline(always)]
 pub fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
     let device_info = device_manager.device_info(device.index())?;
-    let buttplug_device_id = device_info.identifier();
-    let exfiltrated_device_id: ServerDeviceIdentifier = buttplug_device_id.clone().into();
+    let device_id = device_info.identifier();
     Some(
-        match exfiltrated_device_id.attributes_identifier {
-            ProtocolAttributesType::Identifier(attributes_identifier) => format!("{}://{}/{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address, attributes_identifier),
-            ProtocolAttributesType::Default => format!("{}://{}", exfiltrated_device_id.protocol, exfiltrated_device_id.address),
+        match device_id.identifier() {
+            Some(attributes_identifier) => format!("{}://{}/{}", device_id.protocol(), device_id.address(), attributes_identifier),
+            None => format!("{}://{}", device_id.protocol(), device_id.address()),
         }
     )
 }
