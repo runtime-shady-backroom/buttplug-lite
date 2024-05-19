@@ -6,6 +6,7 @@
 
 pub use crate::util::tokio::GLOBAL_TOKIO_RUNTIME;
 
+pub mod exfiltrator;
 pub mod extensions;
 pub mod logging;
 pub mod panic;

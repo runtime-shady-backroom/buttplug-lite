@@ -20,6 +20,10 @@ pub struct CliArgs {
     #[arg(short = 'f', long)]
     pub log_filter: Option<String>,
 
+    /// Run self-checks then immediately exit. This is for internal use and not designed for end users.
+    #[arg(long)]
+    pub self_check: bool,
+
     /// Emit periodic ApplicationStatusEvent ticks every <SECONDS> seconds. These "ticks" force the UI to update device state, which for example can be used to poll device battery levels.
     #[arg(long, id = "SECONDS")]
     pub debug_ticks: Option<u64>,

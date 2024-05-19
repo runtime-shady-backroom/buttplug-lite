@@ -10,7 +10,6 @@ use std::time::Duration;
 use buttplug::client::{ButtplugClient, ButtplugClientEvent};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
 use buttplug::server::ButtplugServerBuilder;
-use buttplug::server::device::configuration::DeviceConfigurationManager;
 use buttplug::server::device::hardware::communication::{
     btleplug::BtlePlugCommunicationManagerBuilder,
     lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder,
@@ -18,7 +17,6 @@ use buttplug::server::device::hardware::communication::{
     lovense_dongle::LovenseSerialDongleCommunicationManagerBuilder,
     serialport::SerialPortCommunicationManagerBuilder,
 };
-use buttplug::server::device::ServerDeviceManagerBuilder;
 use futures::StreamExt as _;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
@@ -68,8 +66,9 @@ async fn start_server_internal(
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
-    let mut device_manager_builder = ServerDeviceManagerBuilder::new(DeviceConfigurationManager::default());
-    device_manager_builder
+    let mut server_builder = ButtplugServerBuilder::default();
+    server_builder
+        .name("buttplug-lite")
         .comm_manager(BtlePlugCommunicationManagerBuilder::default())
         .comm_manager(SerialPortCommunicationManagerBuilder::default())
         .comm_manager(LovenseHIDDongleCommunicationManagerBuilder::default())
@@ -78,11 +77,10 @@ async fn start_server_internal(
 
     #[cfg(target_os = "windows")] {
         use buttplug::server::device::hardware::communication::xinput::XInputDeviceCommunicationManagerBuilder;
-        device_manager_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
+        server_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
     }
 
-    let server = ButtplugServerBuilder::new(device_manager_builder.finish().unwrap())
-        .name("buttplug-lite")
+    let server = server_builder
         .finish()
         .expect("Failed to initialize buttplug server");
 
