@@ -10,7 +10,7 @@ use std::time::Duration;
 use buttplug::client::{ButtplugClient, ButtplugClientEvent};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
 use buttplug::server::ButtplugServerBuilder;
-use buttplug::server::device::configuration::DeviceConfigurationManager;
+use buttplug::server::device::configuration::DeviceConfigurationManagerBuilder;
 use buttplug::server::device::hardware::communication::{
     btleplug::BtlePlugCommunicationManagerBuilder,
     lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder,
@@ -68,7 +68,12 @@ async fn start_server_internal(
     let mut application_state_mutex = application_state_db.write().await;
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
-    let mut device_manager_builder = ServerDeviceManagerBuilder::new(DeviceConfigurationManager::default());
+    // buttplug::util::in_process_client has a good example of how to do this, and so does https://github.com/buttplugio/docs.buttplug.io/blob/master/examples/rust/src/bin/embedded_connector.rs
+    let device_configuration_manager = DeviceConfigurationManagerBuilder::default()
+        .allow_raw_messages(false)
+        .finish()
+        .unwrap();
+    let mut device_manager_builder = ServerDeviceManagerBuilder::new(device_configuration_manager);
     device_manager_builder
         .comm_manager(BtlePlugCommunicationManagerBuilder::default())
         .comm_manager(SerialPortCommunicationManagerBuilder::default())
