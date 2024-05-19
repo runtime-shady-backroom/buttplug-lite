@@ -6,7 +6,6 @@
 #![windows_subsystem = "windows"]
 
 use std::ops::DerefMut as _;
-use std::process;
 use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::time::Duration;
@@ -21,7 +20,6 @@ use crate::app::structs::{ApplicationState, ApplicationStateDb, CliArgs};
 use crate::app::webserver::ShutdownMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
 use crate::util::{logging, watchdog};
-use crate::util::exfiltrator::ServerDeviceIdentifier;
 use crate::util::watchdog::WatchdogTimeoutDb;
 
 mod app;
@@ -36,20 +34,13 @@ fn main() {
 async fn tokio_main() {
     let args: CliArgs = CliArgs::parse();
 
-    // run self-checks to make sure our unsafe hack to steal private fields appears to be working
-    ServerDeviceIdentifier::test();
-
-    if args.self_check {
-        process::exit(0);
-    }
-
     // after logging init we can use tracing to log. Any tracing logs before this point go nowhere.
     let _log_guard = logging::init(
         args.verbose,
         args.log_filter,
         args.stdout,
         args.force_panic_handler,
-        !args.no_panic_handler
+        !args.no_panic_handler,
     );
 
     info!("initializing {} {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), env!("GIT_COMMIT_HASH"));
