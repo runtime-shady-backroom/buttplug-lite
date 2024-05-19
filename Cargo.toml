@@ -17,7 +17,7 @@ lto = "thin" # "fat" made build times extremely slow, so using "thin" as a good 
 
 [dependencies]
 backtrace = "0.3" # Used by custom panic handler
-buttplug = { version = "7", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # Used to connect to buttplugs
+buttplug = { version = "8", default-features = false, features = ["tokio-runtime", "client", "server", "serialize-json", "btleplug-manager", "xinput-manager", "serial-manager", "lovense-dongle-manager", "lovense-connect-service-manager"] } # Used to connect to buttplugs
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] } # Used to generated timestamp strings for log filenames. Weird features are to intentionally drop the deprecated "oldtime" feature
 clap = { version = "4", features = ["derive"] } # Provides command line argument functionality
 directories = "5" # Used to get OS-specific directories for storing application files (logs, configs, etc).
