@@ -1,4 +1,4 @@
-// Copyright 2022-2023 runtime-shady-backroom
+// Copyright 2022-2024 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -41,10 +41,10 @@ pub fn run(
             initial_application_status: initial_devices,
             application_status_subscription,
         },
+        fonts: vec![],
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
         antialiasing: true,
-        exit_on_close_request: false,
     };
 
     Gui::run(settings).expect("could not instantiate window");
@@ -299,9 +299,10 @@ impl Application for Gui {
                         Command::none()
                     }
                     Message::NativeEventOccurred(event) => {
-                        if let Event::Window(iced::window::Event::CloseRequested) = event {
+                        // example: https://github.com/iced-rs/iced/blob/d993b53e095d9cee71c30b315d8fe84d207ddb6d/examples/events/src/main.rs#L40
+                        if let Event::Window(id, iced::window::Event::CloseRequested) = event {
                             info!("received gui shutdown request");
-                            iced::window::close()
+                            iced::window::close(id)
                         } else {
                             Command::none()
                         }
@@ -405,7 +406,8 @@ impl Application for Gui {
 
     // this is called many times in strange and mysterious ways
     fn subscription(&self) -> Subscription<Message> {
-        let native_events = iced::subscription::events()
+        // example: https://github.com/iced-rs/iced/blob/d993b53e095d9cee71c30b315d8fe84d207ddb6d/examples/events/src/main.rs#L57
+        let native_events: Subscription<Message> = iced::event::listen()
             .map(Message::NativeEventOccurred);
 
         match self {
@@ -446,7 +448,7 @@ impl Display for TaggedMotor {
     }
 }
 
-fn render_motor_list(motors: &Vec<TaggedMotor>) -> Element<Message> {
+fn render_motor_list(motors: &[TaggedMotor]) -> Element<Message> {
     let col = Column::new()
         .spacing(TABLE_SPACING)
         .push(Text::new("Motor Configuration").size(TEXT_SIZE_BIG));

@@ -1,8 +1,8 @@
-// Copyright 2022-2023 runtime-shady-backroom
+// Copyright 2022-2024 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use iced::Color;
+use iced::{Border, Color};
 use iced::widget::text_input;
 
 use crate::gui::tagged_motor::TaggedMotorState;
@@ -41,9 +41,11 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0.into(),
-            border_width: 1.0,
-            border_color,
+            border: Border {
+                radius: 2.0.into(),
+                width: 1.0,
+                color: border_color,
+            },
             icon_color,
         }
     }
@@ -63,9 +65,11 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0.into(),
-            border_width: 1.0,
-            border_color,
+            border: Border {
+                radius: 2.0.into(),
+                width: 1.0,
+                color: border_color,
+            },
             icon_color,
         }
     }
@@ -116,9 +120,11 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.base.color.into(),
-            border_radius: 2.0.into(),
-            border_width: 1.0,
-            border_color,
+            border: Border {
+                radius: 2.0.into(),
+                width: 1.0,
+                color: border_color,
+            },
             icon_color,
         }
     }
@@ -138,9 +144,11 @@ impl text_input::StyleSheet for ElementAppearance {
 
         text_input::Appearance {
             background: palette.background.weak.color.into(),
-            border_radius: 2.0.into(),
-            border_width: 1.0,
-            border_color,
+            border: Border {
+                radius: 2.0.into(),
+                width: 1.0,
+                color: border_color,
+            },
             icon_color,
         }
     }

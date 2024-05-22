@@ -1,4 +1,4 @@
-// Copyright 2022-2023 runtime-shady-backroom
+// Copyright 2022-2024 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -32,5 +32,5 @@ const DARK_PALETTE: theme::Palette = theme::Palette {
 };
 
 lazy_static! {
-    pub static ref THEME: Theme = Theme::custom(DARK_PALETTE);
+    pub static ref THEME: Theme = Theme::custom("Dark".to_string(), DARK_PALETTE);
 }
