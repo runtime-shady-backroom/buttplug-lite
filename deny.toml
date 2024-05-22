@@ -102,7 +102,6 @@ allow = [
     "BSL-1.0", # OSI and FSF approved. Needed by clipboard-win, error-code, str-buf
     "CC0-1.0", # FSF but not OSI approved. Needed by hexf-parse
     "MPL-2.0", # OSI and FSF approved. Needed by option-ext
-    "OFL-1.1", # OSI and FSF approved. Needed by iced_wgpu
     "OpenSSL", # FSF but not OSI approved. Needed by ring
     "Unicode-DFS-2016", # OSI but not FSF approved. Needed by unicode-ident
 ]
@@ -219,6 +218,7 @@ skip = [
     "core-graphics",
     "foreign-types",
     "foreign-types-shared",
+    "jni", # Rust bindings to the JNI
     "libloading",
     "libredox",
     "nix",
@@ -230,9 +230,10 @@ skip = [
     "wayland-protocols",
     "wayland-scanner",
     "wayland-sys",
-    "windows",
-    "windows-sys",
-    "windows-targets",
+    "windows", # Safer bindings including C-style APIs as well as COM and WinRT APIs.
+    "windows-core", # Type support for the windows crate
+    "windows-sys", # Raw bindings for C-style Windows APIs.
+    "windows-targets", # Import libs for Windows.
     "windows_aarch64_gnullvm",
     "windows_aarch64_msvc",
     "windows_i686_gnu",
@@ -254,7 +255,7 @@ skip-tree = [
 
     # Allow a few macro helpers. Macros are build-time, so we don't need to worry about duplicates.
     "bitflags",
-    "memoffset",
+    "cfg_aliases", # A tiny utility to help save you a lot of effort with long winded `#[cfg()]` checks.
     "num_enum",
     "proc-macro-crate",
     "strum_macros",
