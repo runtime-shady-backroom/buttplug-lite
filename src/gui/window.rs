@@ -416,7 +416,7 @@ impl Application for Gui {
                     .map(|event| match event {
                         ApplicationStatusEvent::DeviceAdded => Message::RefreshDevices,
                         ApplicationStatusEvent::DeviceRemoved => Message::RefreshDevices,
-                        ApplicationStatusEvent::Tick(_) => Message::Tick
+                        ApplicationStatusEvent::Tick => Message::Tick
                     });
                 Subscription::batch(vec![application_events, native_events])
             }

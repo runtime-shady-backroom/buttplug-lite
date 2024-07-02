@@ -3,7 +3,6 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use futures::stream::{Fuse, StreamExt as _};
 use iced::{Subscription, subscription};
@@ -19,14 +18,12 @@ struct Marker;
 pub enum ApplicationStatusEvent {
     DeviceAdded,
     DeviceRemoved,
-    Tick(u32),
+    Tick,
 }
-
-static NEXT_TICK: AtomicU32 = AtomicU32::new(0);
 
 impl ApplicationStatusEvent {
     pub fn next_tick() -> ApplicationStatusEvent {
-        ApplicationStatusEvent::Tick(NEXT_TICK.fetch_add(1, Ordering::Relaxed))
+        ApplicationStatusEvent::Tick
     }
 }
 

@@ -338,7 +338,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                         };
 
                         devices.entry(motor.into())
-                            .or_insert_with(MotorSettings::default)
+                            .or_default()
                             .scalar_map
                             .insert(motor.feature_index, (intensity, actuator_type.to_buttplug()));
                     }
@@ -362,7 +362,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                         };
 
                         devices.entry(motor.into())
-                            .or_insert_with(MotorSettings::default)
+                            .or_default()
                             .linear_map
                             .insert(motor.feature_index, (duration, position));
                     }
@@ -382,7 +382,7 @@ fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result
                         }
 
                         devices.entry(motor.into())
-                            .or_insert_with(MotorSettings::default)
+                            .or_default()
                             .rotate_map
                             .insert(motor.feature_index, (speed, direction));
                     }

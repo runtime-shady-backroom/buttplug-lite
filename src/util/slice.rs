@@ -3,8 +3,6 @@
 
 //! backport partition_dedup_by and partition_dedup_by_key from rust nightly
 
-use std::mem;
-
 // source: https://doc.rust-lang.org/src/core/slice/mod.rs.html#2886-2888
 // tracking issue: https://github.com/rust-lang/rust/issues/54279
 /// Moves all but the first of consecutive elements to the end of the slice satisfying
@@ -126,7 +124,7 @@ pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> usize
             if !same_bucket(&mut *ptr_read, &mut *prev_ptr_write) {
                 if next_read != next_write {
                     let ptr_write = prev_ptr_write.add(1);
-                    mem::swap(&mut *ptr_read, &mut *ptr_write);
+                    core::ptr::swap(ptr_read, ptr_write);
                 }
                 next_write += 1;
             }

@@ -132,6 +132,7 @@ mod tests {
         logging::init_console(true);
         set_hook();
         let empty: Option<&str> = None;
+        #[allow(clippy::unnecessary_literal_unwrap)]
         empty.unwrap();
 
         // panics after core::panicking::panic_fmt
