@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use buttplug::client::ButtplugClientDevice;
-use buttplug::core::message::{ButtplugDeviceMessageType, ClientGenericDeviceMessageAttributes};
+use buttplug::core::message::{ButtplugDeviceMessageType, ClientGenericDeviceMessageAttributesV3};
 use buttplug::server::device::ServerDeviceManager;
 
 use crate::app::buttplug::structs::DeviceList;
@@ -100,9 +100,9 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
     let empty_vec = Vec::new();
 
     for device in devices.into_iter() {
-        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
+        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..scalar_cmds.len() {
-            let message_attributes: &ClientGenericDeviceMessageAttributes = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
+            let message_attributes: &ClientGenericDeviceMessageAttributesV3 = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
@@ -113,7 +113,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
             motor_configurations.push(motor_config);
         }
 
-        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
+        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..rotate_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
@@ -124,7 +124,7 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
             motor_configurations.push(motor_config);
         }
 
-        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributes> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
+        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
