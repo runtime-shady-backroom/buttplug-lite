@@ -1,11 +1,8 @@
-// Copyright 2022-2024 runtime-shady-backroom
+// Copyright 2022-2025 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use iced::{Color, theme};
-use lazy_static::lazy_static;
-
-pub type Theme = iced::Theme;
+use iced::{theme, Color, Theme};
 
 const DARK_PALETTE: theme::Palette = theme::Palette {
     background: Color::from_rgb(
@@ -31,6 +28,6 @@ const DARK_PALETTE: theme::Palette = theme::Palette {
     ),
 };
 
-lazy_static! {
-    pub static ref THEME: Theme = Theme::custom("Dark".to_string(), DARK_PALETTE);
+pub fn dark_theme() -> Theme {
+    Theme::custom("Dark".to_string(), DARK_PALETTE)
 }

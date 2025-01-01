@@ -1,11 +1,11 @@
-// Copyright 2022-2023 runtime-shady-backroom
+// Copyright 2022-2025 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::cell::RefCell;
 
 use futures::stream::{Fuse, StreamExt as _};
-use iced::{Subscription, subscription};
+use iced::Subscription;
 use iced_futures::MaybeSend;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -38,10 +38,8 @@ pub struct SubscriptionProvider<T> {
     stream: RefCell<Option<Stream<T>>>,
 }
 
-impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
-    pub fn new(
-        receiver: mpsc::UnboundedReceiver<T>) -> SubscriptionProvider<T>
-    {
+impl<T: MaybeSend + 'static> SubscriptionProvider<T> {
+    pub fn new(receiver: mpsc::UnboundedReceiver<T>) -> SubscriptionProvider<T> {
         let stream = UnboundedReceiverStream::new(receiver).fuse();
 
         SubscriptionProvider {
@@ -57,11 +55,11 @@ impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
             None => State::Error,
         };
 
-        subscription::unfold(
+        // example in https://github.com/iced-rs/iced/blob/master/examples/download_progress/src/download.rs
+        Subscription::run_with_id(
             std::any::TypeId::of::<Marker>(),
-            initial_state,
-            |state| async move {
-                match state {
+            futures::stream::unfold(initial_state, |state| async move {
+                let next_state = match state {
                     State::Ready(mut stream) => {
                         let event: T = futures::select! {
                             result = stream.select_next_some() => {
@@ -73,8 +71,9 @@ impl <T: MaybeSend + 'static> SubscriptionProvider<T> {
                     State::Error => {
                         panic!("The subscription ended up in the error state")
                     }
-                }
-            },
+                };
+                Some(next_state)
+            }),
         )
     }
 }

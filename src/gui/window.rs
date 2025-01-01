@@ -1,4 +1,4 @@
-// Copyright 2022-2024 runtime-shady-backroom
+// Copyright 2022-2025 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
@@ -6,13 +6,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use iced::{alignment::Alignment, Application, Command, Element, Event, Length, Settings, Subscription, Theme, theme};
 use iced::widget::{Button, Column, Container, Row, Rule, Scrollable, Text, TextInput};
+use iced::{alignment::Alignment, Element, Event, Length, Settings, Subscription, Task};
 use semver::Version;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 
-use crate::{ApplicationStateDb, ShutdownMessage};
 use crate::app::buttplug;
 use crate::app::structs::{ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
@@ -20,11 +19,13 @@ use crate::gui::constants::*;
 use crate::gui::structs::MotorMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
 use crate::gui::tagged_motor::TaggedMotor;
-use crate::gui::theme::THEME;
-use crate::gui::TokioExecutor;
+use crate::gui::theme::dark_theme;
 use crate::gui::util;
+use crate::gui::TokioExecutor;
 use crate::util::slice as slice_util;
 use crate::util::update_checker;
+use crate::{ApplicationStateDb, ShutdownMessage};
+use crate::gui::util::ConstantTitle;
 
 pub fn run(
     application_state_db: ApplicationStateDb,
@@ -32,22 +33,32 @@ pub fn run(
     initial_devices: ApplicationStatus,
     application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
 ) {
+
     let settings = Settings {
         id: Some("buttplug-lite".to_string()),
-        window: Default::default(),
-        flags: Flags {
-            warp_restart_tx: warp_shutdown_tx.clone(),
-            application_state_db,
-            initial_application_status: initial_devices,
-            application_status_subscription,
-        },
         fonts: vec![],
         default_font: Default::default(),
         default_text_size: TEXT_SIZE_DEFAULT,
         antialiasing: true,
     };
 
-    Gui::run(settings).expect("could not instantiate window");
+    let flags = Flags {
+        warp_restart_tx: warp_shutdown_tx.clone(),
+        application_state_db,
+        initial_application_status: initial_devices,
+        application_status_subscription,
+    };
+
+    let application_title = ConstantTitle(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")));
+    
+    iced::application(application_title, Gui::update, Gui::view)
+        .settings(settings)
+        .theme(|_| dark_theme())
+        .executor::<TokioExecutor>()
+        .subscription(Gui::subscription)
+        .run_with(|| Gui::new(flags))
+        .expect("could not instantiate window");
+
     match warp_shutdown_tx.send(ShutdownMessage::Shutdown) {
         Ok(()) => info!("shutdown triggered by UI close"),
         Err(e) => panic!("Error triggering shutdown: {}", e)
@@ -104,12 +115,12 @@ struct State {
 }
 
 impl Gui {
-    fn new(flags: Flags) -> Self {
+    fn new(flags: Flags) -> (Self, Task<Message>) {
         let config_version = flags.initial_application_status.configuration.version;
         let port = flags.initial_application_status.configuration.port;
         let ApplicationStatus { motors, devices, configuration } = flags.initial_application_status;
 
-        Gui::Loaded(State {
+        let gui = Gui::Loaded(State {
             devices,
             motors,
             port,
@@ -122,7 +133,9 @@ impl Gui {
             last_configuration: configuration,
             application_status_subscription: flags.application_status_subscription,
             update_check: UpdateCheck::Uninitialized,
-        })
+        });
+
+        (gui, Task::perform(gui_startup_action(), Message::StartupActionCompleted))
     }
 
     fn on_configuration_changed(&mut self) {
@@ -132,23 +145,8 @@ impl Gui {
             state.configuration_dirty = new_configuration != state.last_configuration;
         }
     }
-}
 
-impl Application for Gui {
-    type Executor = TokioExecutor;
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = Flags;
-
-    fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        (Gui::new(flags), Command::perform(gui_startup_action(), Message::StartupActionCompleted))
-    }
-
-    fn title(&self) -> String {
-        format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
-    }
-
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match self {
             Gui::Invalid => {
                 panic!("GUI was unexpectedly in an invalid state");
@@ -157,11 +155,11 @@ impl Application for Gui {
                 match message {
                     Message::StartupActionCompleted(result) => {
                         state.update_check = result.update_check;
-                        Command::none()
+                        Task::none()
                     }
                     Message::RefreshDevices => {
                         info!("device refresh triggered");
-                        Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
+                        Task::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::RefreshDevicesComplete(application_status) => {
                         if let Some(application_status) = application_status {
@@ -197,12 +195,12 @@ impl Application for Gui {
                         }
 
                         debug!("Finished handling RefreshDevicesComplete event");
-                        Command::none()
+                        Task::none()
                     }
                     Message::SaveConfigurationRequest => {
                         if state.saving {
                             debug!("Save requested but we're already saving! I didn't realize this was possible… but I handled it anyways");
-                            Command::none()
+                            Task::none()
                         } else {
                             info!("save initiated");
                             state.saving = true;
@@ -210,7 +208,7 @@ impl Application for Gui {
                             state.port_text = state.port.to_string();
 
                             let configuration = ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
-                            Command::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
+                            Task::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
                         }
                     }
                     Message::SaveConfigurationComplete(result) => {
@@ -228,14 +226,14 @@ impl Application for Gui {
 
                         // trigger a motor refresh
                         // this is needed because when we hit save we may have cleared old tags that no longer match any existing device
-                        Command::perform(get_tagged_devices(application_state), Message::RefreshDevicesComplete)
+                        Task::perform(get_tagged_devices(application_state), Message::RefreshDevicesComplete)
                     }
                     Message::PortUpdated(new_port) => {
                         state.port_text = new_port;
                         //TODO: notify user if port is invalid
                         state.port = state.port_text.parse::<u16>().unwrap_or(state.port);
                         self.on_configuration_changed();
-                        Command::none()
+                        Task::none()
                     }
                     Message::MotorMessageContainer(motor_index, motor_message) => {
                         // this happens BEFORE state.motors is updated with the new information passed via this message
@@ -296,20 +294,20 @@ impl Application for Gui {
 
                         state.motor_tags_valid = duplicate_indices.is_empty() && tags_valid;
                         self.on_configuration_changed();
-                        Command::none()
+                        Task::none()
                     }
                     Message::NativeEventOccurred(event) => {
-                        // example: https://github.com/iced-rs/iced/blob/d993b53e095d9cee71c30b315d8fe84d207ddb6d/examples/events/src/main.rs#L40
-                        if let Event::Window(id, iced::window::Event::CloseRequested) = event {
+                        // example: https://github.com/iced-rs/iced/blob/master/examples/events/src/main.rs
+                        if let Event::Window(iced::window::Event::CloseRequested) = event {
                             info!("received gui shutdown request");
-                            iced::window::close(id)
+                            iced::window::get_latest().and_then(iced::window::close)
                         } else {
-                            Command::none()
+                            Task::none()
                         }
                     }
                     Message::Tick => {
                         // this should keep battery levels reasonably up to date
-                        Command::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
+                        Task::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
                     }
                     Message::UpdateButtonPressed => {
                         if let UpdateCheck::UpdateNeeded(update_url) = &state.update_check {
@@ -318,7 +316,7 @@ impl Application for Gui {
                             panic!("Somehow pressed the update button without it visible!?");
                         }
 
-                        Command::none()
+                        Task::none()
                     }
                 }
             }
@@ -356,7 +354,7 @@ impl Application for Gui {
                                 row.push(
                                     Button::new(Text::new("Update Available!"))
                                         .on_press(Message::UpdateButtonPressed)
-                                        .style(theme::Button::Destructive)
+                                        .style(iced::widget::button::danger) // example: https://github.com/iced-rs/iced/blob/master/examples/pane_grid/src/main.rs
                                 )
                             } else {
                                 row
@@ -364,7 +362,7 @@ impl Application for Gui {
                         })
                         .push(Row::new()
                             .spacing(EOL_INPUT_SPACING)
-                            .align_items(Alignment::Center)
+                            .align_y(Alignment::Center)
                             .push(util::input_label("Server port:"))
                             .push(
                                 TextInput::new("server port", state.port_text.as_str())
@@ -398,10 +396,6 @@ impl Application for Gui {
                     .into()
             }
         }
-    }
-
-    fn theme(&self) -> Self::Theme {
-        THEME.clone()
     }
 
     // this is called many times in strange and mysterious ways

@@ -1,11 +1,11 @@
-// Copyright 2022-2023 runtime-shady-backroom
+// Copyright 2022-2025 runtime-shady-backroom
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::cmp::Ordering;
 
-use iced::{Alignment, Element, Length, theme};
 use iced::widget::{Button, Row, Text, TextInput};
+use iced::{Alignment, Element, Length};
 
 use crate::config::v3::MotorConfigurationV3;
 use crate::gui::constants::*;
@@ -81,7 +81,7 @@ impl TaggedMotor {
     pub fn view(&self) -> Element<MotorMessage> {
         let row = Row::new()
             .spacing(EOL_INPUT_SPACING)
-            .align_items(Alignment::Center)
+            .align_y(Alignment::Center)
             .push(util::input_label(format!("{}", &self.motor)));
 
         let row = match &self.state {
@@ -92,7 +92,10 @@ impl TaggedMotor {
                         .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: *valid })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
-                        .style(theme::TextInput::Custom(Box::new(ElementAppearance::from(&self.state))))
+                        .style(|theme, status| {
+                            // example: https://github.com/iced-rs/iced/blob/master/examples/scrollable/src/main.rs
+                            ElementAppearance::from(&self.state).text_input_custom_style(theme, status)
+                        })
                 )
                     .push(
                         Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
