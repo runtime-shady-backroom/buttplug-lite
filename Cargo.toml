@@ -22,7 +22,7 @@ directories = "5" # Used to get OS-specific directories for storing application 
 futures = { version = "0.3", default-features = false } # Necessary for working with async results.
 iced = "0.12" # Provides the GUI
 iced_futures = "0.12" # Needed by iced
-itertools = "0.13" # Used for duplicate detection in a Vec
+itertools = "0.14" # Used for duplicate detection in a Vec
 lazy_static = "1" # Used to initialize globals at runtime
 open = "5" # Used to open application update pages in your browser
 reqwest = { version = "0.12", features = ["gzip", "json"] } # HTTP client used by the update checker
