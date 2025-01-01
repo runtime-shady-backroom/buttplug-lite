@@ -2,10 +2,10 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use iced::widget::text_input;
-use iced::{Background, Border, Theme};
-use iced::widget::text_input::Status;
 use crate::gui::tagged_motor::TaggedMotorState;
+use iced::widget::text_input;
+use iced::widget::text_input::Status;
+use iced::{Background, Border, Theme};
 
 pub enum ElementAppearance {
     Valid,
@@ -22,6 +22,14 @@ impl From<&TaggedMotorState> for ElementAppearance {
 }
 
 impl ElementAppearance {
+    
+    pub fn from_port_text(port_text: &str) -> Self {
+        match port_text.parse::<u16>() {
+            Err(_) => ElementAppearance::Invalid,
+            Ok(0) => ElementAppearance::Invalid,
+            Ok(_) => ElementAppearance::Valid,
+        }
+    }
 
     // example: https://github.com/iced-rs/iced/blob/master/examples/scrollable/src/main.rs
     pub fn text_input_custom_style(&self, theme: &Theme, status: Status) -> text_input::Style {

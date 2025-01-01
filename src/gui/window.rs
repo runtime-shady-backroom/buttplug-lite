@@ -25,6 +25,7 @@ use crate::gui::TokioExecutor;
 use crate::util::slice as slice_util;
 use crate::util::update_checker;
 use crate::{ApplicationStateDb, ShutdownMessage};
+use crate::gui::element_appearance::ElementAppearance;
 use crate::gui::util::ConstantTitle;
 
 pub fn run(
@@ -370,6 +371,9 @@ impl Gui {
                                     .on_paste(Message::PortUpdated)
                                     .width(Length::Fixed(PORT_INPUT_WIDTH))
                                     .padding(TEXT_INPUT_PADDING)
+                                    .style(|theme, status| {
+                                        ElementAppearance::from_port_text(state.port_text.as_str()).text_input_custom_style(theme, status)
+                                    })
                             )
                         )
                         .push(
