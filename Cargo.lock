@@ -440,7 +440,16 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.6.3",
+]
+
+[[package]]
+name = "bit-set"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
+dependencies = [
+ "bit-vec 0.8.0",
 ]
 
 [[package]]
@@ -448,6 +457,12 @@ name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
+name = "bit-vec"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
@@ -577,9 +592,9 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "buttplug"
-version = "9.0.4"
+version = "9.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f0b46a6d63bcc9e3c4755dc349a35929aafba9f2760235213badf4b7722a2ca"
+checksum = "20cc2fac9fafc7eb905f19b941309a425801094f0d8df9aebc8748c8d150bc72"
 dependencies = [
  "aes",
  "ahash 0.8.11",
@@ -595,6 +610,7 @@ dependencies = [
  "ecb",
  "futures",
  "futures-util",
+ "getrandom",
  "getset",
  "hidapi",
  "instant",
@@ -617,7 +633,7 @@ dependencies = [
  "sha2",
  "strum",
  "strum_macros",
- "thiserror 1.0.69",
+ "thiserror 2.0.9",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -1496,11 +1512,11 @@ dependencies = [
 
 [[package]]
 name = "fancy-regex"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "531e46835a22af56d1e3b66f04844bed63158bc094a628bec1d321d9b4c44bf2"
+checksum = "6e24cb5a94bcae1e5408b0effca5cd7172ea3c5755049c5f3af4cd283a165298"
 dependencies = [
- "bit-set",
+ "bit-set 0.8.0",
  "regex-automata 0.4.9",
  "regex-syntax 0.8.5",
 ]
@@ -2732,29 +2748,25 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.22.3"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0762f81b67c46ac403497420b7f4ae457f6cdbef499d24f101bf4a63c35ddea1"
+checksum = "26a960f0c34d5423581d858ce94815cc11f0171b09939409097969ed269ede1b"
 dependencies = [
  "ahash 0.8.11",
- "anyhow",
  "base64 0.22.1",
  "bytecount",
  "email_address",
  "fancy-regex",
  "fraction",
- "getrandom",
  "idna",
  "itoa",
  "num-cmp",
  "once_cell",
  "percent-encoding",
  "referencing",
- "regex",
  "regex-syntax 0.8.5",
  "serde",
  "serde_json",
- "url",
  "uuid-simd",
 ]
 
@@ -3036,7 +3048,7 @@ version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50e3524642f53d9af419ab5e8dd29d3ba155708267667c2f3f06c88c9e130843"
 dependencies = [
- "bit-set",
+ "bit-set 0.5.3",
  "bitflags 2.6.0",
  "codespan-reporting",
  "hexf-parse",
@@ -4188,9 +4200,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.22.3"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43fda277062a68f002ee482f8319d2fcc84be5ff11669cacd74db7ca01f7f36a"
+checksum = "fb8e15af8558cb157432dd3d88c1d1e982d0a5755cf80ce593b6499260aebc49"
 dependencies = [
  "ahash 0.8.11",
  "fluent-uri",
@@ -5675,12 +5687,13 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.45"
+version = "0.4.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc7ec4f8827a71586374db3e87abdb5a2bb3a15afed140221307c3ec06b1f63b"
+checksum = "38176d9b44ea84e9184eff0bc34cc167ed044f816accfe5922e54d84cf48eca2"
 dependencies = [
  "cfg-if",
  "js-sys",
+ "once_cell",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -5731,9 +5744,9 @@ dependencies = [
 
 [[package]]
 name = "wasmtimer"
-version = "0.2.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7ed9d8b15c7fb594d72bfb4b5a276f3d2029333cd93a932f376f5937f6f80ee"
+checksum = "0048ad49a55b9deb3953841fa1fc5858f0efbcb7a18868c899a360269fac1b23"
 dependencies = [
  "futures",
  "js-sys",
@@ -5913,7 +5926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28b94525fc99ba9e5c9a9e24764f2bc29bad0911a7446c12f446a8277369bf3a"
 dependencies = [
  "arrayvec",
- "bit-vec",
+ "bit-vec 0.6.3",
  "bitflags 2.6.0",
  "cfg_aliases 0.1.1",
  "codespan-reporting",
@@ -5941,7 +5954,7 @@ dependencies = [
  "android_system_properties",
  "arrayvec",
  "ash",
- "bit-set",
+ "bit-set 0.5.3",
  "bitflags 2.6.0",
  "block",
  "cfg_aliases 0.1.1",
