@@ -236,6 +236,8 @@ skip = [
     { crate = "ttf-parser@0.20.0", reason = "used by iced... and the new version is ALSO used by iced" },
     { crate = "ttf-parser@0.21.1", reason = "used by iced... and the new version is ALSO used by iced" },
     { crate = "windows-result@0.1.2", reason = "used by buttplug/btleplug/windows/windows-core... and the new version is used by buttplug as well" },
+    { crate = "bit-set@0.5.3", reason = "used by iced/.../wgpu" },
+    { crate = "bit-vec@0.6.3", reason = "used by iced/.../wgpu" },
 
     # Allow a bunch of wrapper libs (native bindings, etc.)
     "core-graphics",
