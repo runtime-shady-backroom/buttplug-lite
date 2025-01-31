@@ -238,6 +238,7 @@ skip = [
     { crate = "windows-result@0.1.2", reason = "used by buttplug/btleplug/windows/windows-core... and the new version is used by buttplug as well" },
     { crate = "bit-set@0.5.3", reason = "used by iced/.../wgpu" },
     { crate = "bit-vec@0.6.3", reason = "used by iced/.../wgpu" },
+    { crate = "redox_users@0.4.6", reason = "used by iced/.../dirs" },
 
     # Allow a bunch of wrapper libs (native bindings, etc.)
     "core-graphics",
