@@ -58,6 +58,16 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
           })
             ''
+              mkdir -p $out/share/applications/
+              cp ${
+                pkgs.makeDesktopItem {
+                  name = "buttplug-lite";
+                  exec = "buttplug-lite";
+                  desktopName = "Buttplug Lite";
+                  comment = "Simplified buttplug.io API for when JSON is infeasible";
+                }
+              }/share/applications/buttplug-lite.desktop $out/share/applications/
+
               makeWrapper ${unwrapped}/bin/buttplug-lite $out/bin/buttplug-lite --suffix LD_LIBRARY_PATH : ${libraryPath}
             '';
       };
