@@ -11,7 +11,7 @@ This application serves a websocket that runs a dramatically simplified version 
 
 ### Install via Nix
 
-1. To use this, you need to make use of the Flake system. If you dont know what that means, search it up before you continue.
+1. To use this, you need to make use of the Flake system. If you dont know what that means, look at https://wiki.nixos.org/wiki/Flakes before you continue. You cannot use this without making use of Flakes.
 2. In your flake.nix file, add `buttplug-lite = { url = "github:runtime-shady-backroom/buttplug-lite?ref=master"; inputs.nixpkgs.follows = "nixpkgs"; };` to your inputs at the top of the file.
 3. Pass `buttplug-lite` through to where ever you want to use the package.
 4. Add the package `buttplug-lite.packages.x86_64-linux.default` to whatever way you use to add packages. Things like `environment.systemPackages`.
