@@ -74,6 +74,7 @@ ignore = [
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     { id = "RUSTSEC-2024-0388", reason = "derivative 2.2.0 is no longer maintained, but is used by a mandatory dependency (buttplug)" },
     { id = "RUSTSEC-2024-0384", reason = "instant 0.1.13 is no longer maintained, but is used by a mandatory dependency (buttplug)" },
+    { id = "RUSTSEC-2024-0436", reason = "paste 1.0.15 is no longer maintained, but is used by a mandatory dependency (buttplug)" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
 ]
@@ -104,8 +105,8 @@ allow = [
     # Weirder stuff
     "BSL-1.0", # OSI and FSF approved. Needed by clipboard-win, error-code, str-buf
     "CC0-1.0", # FSF but not OSI approved. Needed by hexf-parse
+    'CDLA-Permissive-2.0', # neither FSF nor OSI approved, but this is not really software. Needed by webpki-roots
     "MPL-2.0", # OSI and FSF approved. Needed by option-ext
-    "OpenSSL", # FSF but not OSI approved. Needed by ring
     "Unicode-3.0", # OSI but not FSF approved. Needed by unicode-ident
 ]
 # The confidence threshold for detecting a license from license text.
@@ -124,20 +125,20 @@ exceptions = [
 # Some crates don't have (easily) machine readable licensing information,
 # adding a clarification entry for it allows you to manually specify the
 # licensing information
-[[licenses.clarify]]
+#[[licenses.clarify]]
 # The package spec the clarification applies to
-crate = "ring"
+#crate = "ring"
 # The SPDX expression for the license requirements of the crate
-expression = "MIT AND ISC AND OpenSSL"
+#expression = "MIT AND ISC AND OpenSSL"
 # One or more files in the crate's source used as the "source of truth" for
 # the license expression. If the contents match, the clarification will be used
 # when running the license check, otherwise the clarification will be ignored
 # and the crate will be checked normally, which may produce warnings or errors
 # depending on the rest of your configuration
-license-files = [
+#license-files = [
     # Each entry is a crate relative path, and the (opaque) hash of its contents
-    { path = "LICENSE", hash = 0xbd0eed23 }
-]
+#    { path = "LICENSE", hash = 0xbd0eed23 }
+#]
 
 [licenses.private]
 # If true, ignores workspace crates that aren't published, or are only
@@ -235,10 +236,12 @@ skip = [
     { crate = "thiserror-impl@1.0.69", reason = "still used by a LOT of stuff, but the v2 migration has begun" },
     { crate = "ttf-parser@0.20.0", reason = "used by iced... and the new version is ALSO used by iced" },
     { crate = "ttf-parser@0.21.1", reason = "used by iced... and the new version is ALSO used by iced" },
-    { crate = "windows-result@0.1.2", reason = "used by buttplug/btleplug/windows/windows-core... and the new version is used by buttplug as well" },
     { crate = "bit-set@0.5.3", reason = "used by iced/.../wgpu" },
     { crate = "bit-vec@0.6.3", reason = "used by iced/.../wgpu" },
     { crate = "redox_users@0.4.6", reason = "used by iced/.../dirs" },
+    { crate = "windows-strings@0.3.1", reason = "used by buttplug/reqwest/windows-registry... and the new version is used by buttplug as well" },
+    { crate = "webpki-roots@0.26.11", reason = "webpki-roots@0.26.11 fucking depends on webpki-roots@1.0.0 what the fuck" },
+    { crate = "linux-raw-sys@0.4.15", reason = "old version is still used by a bunch of stuff" },
 
     # Allow a bunch of wrapper libs (native bindings, etc.)
     "core-graphics",
