@@ -5,9 +5,16 @@ This application serves a websocket that runs a dramatically simplified version 
 ## Installation and Usage
 
 1. Download the [latest release](https://github.com/runtime-shady-backroom/buttplug-lite/releases/latest).
-2. Run buttplug-lite-windows.exe (or your operating system's appropriate binary if you aren't on Windows. Builds are also provided for macOS and Linux.)
+2. Run buttplug-lite-windows.exe (or your operating system's appropriate binary if you aren't on Windows. Builds are also provided for macOS and Linux. See the section below for a way to use this via the Nix package manager)
 3. Add tags for the devices you plan to use.
 4. Press "apply configuration" to save your settings and apply them to the current server.
+
+### Install via Nix
+
+1. To use this, you need to make use of the Flake system. If you dont know what that means, look at https://wiki.nixos.org/wiki/Flakes before you continue. You cannot use this without making use of Flakes.
+2. In your flake.nix file, add `buttplug-lite = { url = "github:runtime-shady-backroom/buttplug-lite?ref=master"; inputs.nixpkgs.follows = "nixpkgs"; };` to your inputs at the top of the file.
+3. Pass `buttplug-lite` through to where ever you want to use the package.
+4. Add the package `buttplug-lite.packages.x86_64-linux.default` to whatever way you use to add packages. Things like `environment.systemPackages`.
 
 ## Features
 
