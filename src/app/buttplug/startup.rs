@@ -9,15 +9,14 @@ use std::time::Duration;
 
 use buttplug::client::{ButtplugClient, ButtplugClientEvent};
 use buttplug::core::connector::ButtplugInProcessClientConnectorBuilder;
-use buttplug::server::ButtplugServerBuilder;
 use buttplug::server::device::hardware::communication::{
     btleplug::BtlePlugCommunicationManagerBuilder,
     lovense_connect_service::LovenseConnectServiceCommunicationManagerBuilder,
     lovense_dongle::LovenseHIDDongleCommunicationManagerBuilder,
-    lovense_dongle::LovenseSerialDongleCommunicationManagerBuilder,
-    serialport::SerialPortCommunicationManagerBuilder,
+    lovense_dongle::LovenseSerialDongleCommunicationManagerBuilder, serialport::SerialPortCommunicationManagerBuilder,
 };
 use buttplug::server::device::ServerDeviceManagerBuilder;
+use buttplug::server::ButtplugServerBuilder;
 use futures::StreamExt as _;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
@@ -50,9 +49,15 @@ pub async fn start_server(
     task::spawn(async move {
         loop {
             // we reconnect here regardless of server state
-            start_server_internal(application_state.clone(), initial_config_loaded_tx, application_status_sender.clone()).await; // will "block" until disconnect
+            start_server_internal(
+                application_state.clone(),
+                initial_config_loaded_tx,
+                application_status_sender.clone(),
+            )
+            .await; // will "block" until disconnect
             initial_config_loaded_tx = None; // only Some() for the first loop
-            tokio::time::sleep(Duration::from_millis(BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS)).await; // reconnect delay
+            tokio::time::sleep(Duration::from_millis(BUTTPLUG_SERVER_RECONNECT_DELAY_MILLIS)).await;
+            // reconnect delay
         }
     });
 }
@@ -68,7 +73,9 @@ async fn start_server_internal(
     let buttplug_client = ButtplugClient::new(BUTTPLUG_CLIENT_NAME);
 
     // buttplug::util::in_process_client has a good example of how to do this, and so does https://github.com/buttplugio/docs.buttplug.io/blob/master/examples/rust/src/bin/embedded_connector.rs
-    let mut device_configuration_manager_builder = buttplug::util::device_configuration::load_protocol_configs(&None, &None, false).expect("Failed to load protocol configs");
+    let mut device_configuration_manager_builder =
+        buttplug::util::device_configuration::load_protocol_configs(&None, &None, false)
+            .expect("Failed to load protocol configs");
     let device_configuration_manager = device_configuration_manager_builder
         .allow_raw_messages(false)
         .finish()
@@ -81,7 +88,8 @@ async fn start_server_internal(
         .comm_manager(LovenseSerialDongleCommunicationManagerBuilder::default())
         .comm_manager(LovenseConnectServiceCommunicationManagerBuilder::default());
 
-    #[cfg(target_os = "windows")] {
+    #[cfg(target_os = "windows")]
+    {
         use buttplug::server::device::hardware::communication::xinput::XInputDeviceCommunicationManagerBuilder;
         device_manager_builder.comm_manager(XInputDeviceCommunicationManagerBuilder::default());
     }
@@ -109,19 +117,21 @@ async fn start_server_internal(
             let mut event_stream = buttplug_client.event_stream();
             match buttplug_client.start_scanning().await {
                 Ok(()) => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: starting device scan"),
-                Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: scan failure: {e:?}")
+                Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: scan failure: {e:?}"),
             };
 
             // reuse old config, or load from disk if this is the initial connection
             let previous_state = application_state_mutex.deref_mut().take();
             let configuration = match previous_state {
                 Some(ApplicationState { configuration, .. }) => configuration,
-                None => {
-                    config::load_configuration().await
-                }
+                None => config::load_configuration().await,
             };
 
-            *application_state_mutex = Some(ApplicationState { client: buttplug_client, configuration, device_manager: device_manager.clone() });
+            *application_state_mutex = Some(ApplicationState {
+                client: buttplug_client,
+                configuration,
+                device_manager: device_manager.clone(),
+            });
             drop(application_state_mutex); // prevent this section from requiring two locks
 
             if let Some(sender) = initial_config_loaded_tx {
@@ -132,16 +142,28 @@ async fn start_server_internal(
                 match event_stream.next().await {
                     Some(event) => match event {
                         ButtplugClientEvent::DeviceAdded(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}", debug_name_from_device(&dev, &device_manager));
-                            application_status_event_sender.send(ApplicationStatusEvent::DeviceAdded).expect("failed to send device added event");
+                            info!(
+                                "{LOG_PREFIX_BUTTPLUG_SERVER}: device connected: {}",
+                                debug_name_from_device(&dev, &device_manager)
+                            );
+                            application_status_event_sender
+                                .send(ApplicationStatusEvent::DeviceAdded)
+                                .expect("failed to send device added event");
                         }
                         ButtplugClientEvent::DeviceRemoved(dev) => {
-                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}", debug_name_from_device(&dev, &device_manager));
-                            application_status_event_sender.send(ApplicationStatusEvent::DeviceRemoved).expect("failed to send device removed event");
+                            info!(
+                                "{LOG_PREFIX_BUTTPLUG_SERVER}: device disconnected: {}",
+                                debug_name_from_device(&dev, &device_manager)
+                            );
+                            application_status_event_sender
+                                .send(ApplicationStatusEvent::DeviceRemoved)
+                                .expect("failed to send device removed event");
                         }
                         ButtplugClientEvent::PingTimeout => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: ping timeout"),
                         ButtplugClientEvent::Error(e) => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server error: {e:?}"),
-                        ButtplugClientEvent::ScanningFinished => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device scan finished"),
+                        ButtplugClientEvent::ScanningFinished => {
+                            info!("{LOG_PREFIX_BUTTPLUG_SERVER}: device scan finished")
+                        }
                         ButtplugClientEvent::ServerConnect => info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server connected"),
                         ButtplugClientEvent::ServerDisconnect => {
                             info!("{LOG_PREFIX_BUTTPLUG_SERVER}: server disconnected");
@@ -150,10 +172,10 @@ async fn start_server_internal(
                             break;
                         }
                     },
-                    None => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: error reading haptic event")
+                    None => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: error reading haptic event"),
                 };
             }
         }
-        Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly… ({e:?})") // will try to reconnect later, may not need to log this error
+        Err(e) => warn!("{LOG_PREFIX_BUTTPLUG_SERVER}: failed to connect to server. Will retry shortly… ({e:?})"), // will try to reconnect later, may not need to log this error
     }
 }

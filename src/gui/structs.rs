@@ -6,10 +6,7 @@
 
 #[derive(Clone, Debug)]
 pub enum MotorMessage {
-    TagUpdated {
-        tag: String,
-        valid: bool,
-    },
+    TagUpdated { tag: String, valid: bool },
     TagDeleted,
 }
 

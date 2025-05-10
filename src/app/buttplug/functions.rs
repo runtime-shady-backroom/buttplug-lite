@@ -28,8 +28,13 @@ pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Op
             let mut tagged_motors = motors_to_tagged(tags);
 
             // for each device not yet in TaggedMotor, generate a new dummy TaggedMotor
-            let mut missing_motors: Vec<TaggedMotor> = motors.into_iter()
-                .filter(|motor| !tagged_motors.iter().any(|possible_match| &possible_match.motor == motor))
+            let mut missing_motors: Vec<TaggedMotor> = motors
+                .into_iter()
+                .filter(|motor| {
+                    !tagged_motors
+                        .iter()
+                        .any(|possible_match| &possible_match.motor == motor)
+                })
                 .map(|missing_motor| TaggedMotor::new(missing_motor, None))
                 .collect();
 
@@ -46,7 +51,7 @@ pub async fn get_tagged_devices(application_state_db: &ApplicationStateDb) -> Op
                 configuration: configuration.clone(),
             })
         }
-        None => None
+        None => None,
     }
 }
 
@@ -69,12 +74,15 @@ fn display_name_from_device(device: &ButtplugClientDevice) -> String {
 pub fn id_from_device(device: &ButtplugClientDevice, device_manager: &ServerDeviceManager) -> Option<String> {
     let device_info = device_manager.device_info(device.index())?;
     let device_id = device_info.identifier();
-    Some(
-        match device_id.identifier() {
-            Some(attributes_identifier) => format!("{}://{}/{}", device_id.protocol(), device_id.address(), attributes_identifier),
-            None => format!("{}://{}", device_id.protocol(), device_id.address()),
-        }
-    )
+    Some(match device_id.identifier() {
+        Some(attributes_identifier) => format!(
+            "{}://{}/{}",
+            device_id.protocol(),
+            device_id.address(),
+            attributes_identifier
+        ),
+        None => format!("{}://{}", device_id.protocol(), device_id.address()),
+    })
 }
 
 /// Get a full debug name for a device. This is intended for logging.
@@ -87,7 +95,10 @@ pub fn debug_name_from_device(device: &ButtplugClientDevice, device_manager: &Se
 }
 
 /// get all distinct motors
-fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, device_manager: &ServerDeviceManager) -> Vec<MotorConfigurationV3> {
+fn motor_configuration_from_devices(
+    devices: Vec<Arc<ButtplugClientDevice>>,
+    device_manager: &ServerDeviceManager,
+) -> Vec<MotorConfigurationV3> {
     let mut motor_configuration_count: usize = 0;
     for device in devices.iter() {
         motor_configuration_count += device.message_attributes().scalar_cmd().as_ref().map_or(0, |v| v.len());
@@ -100,9 +111,12 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
     let empty_vec = Vec::new();
 
     for device in devices.into_iter() {
-        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
+        let scalar_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> =
+            device.message_attributes().scalar_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..scalar_cmds.len() {
-            let message_attributes: &ClientGenericDeviceMessageAttributesV3 = scalar_cmds.get(index).expect("I didn't know a vec could change mid-iteration");
+            let message_attributes: &ClientGenericDeviceMessageAttributesV3 = scalar_cmds
+                .get(index)
+                .expect("I didn't know a vec could change mid-iteration");
             let actuator_type: ActuatorType = message_attributes.actuator_type().into();
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
@@ -113,7 +127,8 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
             motor_configurations.push(motor_config);
         }
 
-        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
+        let rotate_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> =
+            device.message_attributes().rotate_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..rotate_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
@@ -124,7 +139,8 @@ fn motor_configuration_from_devices(devices: Vec<Arc<ButtplugClientDevice>>, dev
             motor_configurations.push(motor_config);
         }
 
-        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> = device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
+        let linear_cmds: &Vec<ClientGenericDeviceMessageAttributesV3> =
+            device.message_attributes().linear_cmd().as_ref().unwrap_or(&empty_vec);
         for index in 0..linear_cmds.len() {
             let motor_config = MotorConfigurationV3 {
                 device_name: display_name_from_device(&device),
@@ -144,18 +160,28 @@ async fn get_devices(application_state: &ApplicationState) -> DeviceList {
     let mut device_statuses: Vec<DeviceStatus> = Vec::with_capacity(devices.len());
 
     for device in devices.iter() {
-        let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
+        let battery_level = if device
+            .message_attributes()
+            .message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd)
+        {
             device.battery_level().await.ok()
         } else {
             None
         };
-        let rssi_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::RSSILevelCmd) {
+        let rssi_level = if device
+            .message_attributes()
+            .message_allowed(&ButtplugDeviceMessageType::RSSILevelCmd)
+        {
             device.rssi_level().await.ok()
         } else {
             None
         };
         let name: String = device.name().to_string();
-        device_statuses.push(DeviceStatus { name, battery_level, rssi_level })
+        device_statuses.push(DeviceStatus {
+            name,
+            battery_level,
+            rssi_level,
+        })
     }
 
     let motors = motor_configuration_from_devices(devices, &application_state.device_manager);

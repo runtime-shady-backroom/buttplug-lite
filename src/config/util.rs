@@ -2,9 +2,9 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use std::{convert, fs};
 use std::ops::DerefMut as _;
 use std::path::PathBuf;
+use std::{convert, fs};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
@@ -12,11 +12,11 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tracing::{info, warn};
 
-use crate::{ApplicationState, ApplicationStateDb, ShutdownMessage};
-use crate::config::CONFIG_VERSION;
-use crate::config::ConfigurationMinimal;
 use crate::config::v2::ConfigurationV2;
 use crate::config::v3::ConfigurationV3;
+use crate::config::ConfigurationMinimal;
+use crate::config::CONFIG_VERSION;
+use crate::{ApplicationState, ApplicationStateDb, ShutdownMessage};
 
 static CONFIG_FILE_NAME: &str = "config.toml";
 
@@ -42,12 +42,20 @@ pub fn get_backup_config_file_path(version: i32) -> PathBuf {
 }
 
 /// update in-memory configuration
-pub async fn update_configuration(application_state_db: &ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: &mpsc::UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
+pub async fn update_configuration(
+    application_state_db: &ApplicationStateDb,
+    configuration: ConfigurationV3,
+    warp_shutdown_tx: &mpsc::UnboundedSender<ShutdownMessage>,
+) -> Result<ConfigurationV3, String> {
     save_configuration(&configuration).await?;
     let mut lock = application_state_db.write().await;
     let previous_state = lock.deref_mut().take();
     match previous_state {
-        Some(ApplicationState { client, configuration: previous_configuration, device_manager }) => {
+        Some(ApplicationState {
+            client,
+            configuration: previous_configuration,
+            device_manager,
+        }) => {
             let new_port = configuration.port;
             *lock = Some(ApplicationState {
                 client,
@@ -58,13 +66,14 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
 
             // restart warp if necessary
             if new_port != previous_configuration.port {
-                warp_shutdown_tx.send(ShutdownMessage::Restart)
+                warp_shutdown_tx
+                    .send(ShutdownMessage::Restart)
                     .map_err(|e| format!("{e:?}"))?;
             }
 
             Ok(configuration)
         }
-        None => Err("cannot update configuration until after initial haptic server startup".into())
+        None => Err("cannot update configuration until after initial haptic server startup".into()),
     }
 }
 
@@ -72,9 +81,8 @@ pub async fn update_configuration(application_state_db: &ApplicationStateDb, con
 pub async fn save_configuration(configuration: &ConfigurationV3) -> Result<(), String> {
     // config serialization should never fail, so we should be good to panic
     let serialized_config = toml::to_string(configuration).expect("failed to serialize configuration");
-    task::spawn_blocking(|| {
-        fs::write(CONFIG_DIR_FILE_PATH.as_path(), serialized_config).map_err(|e| format!("{e:?}"))
-    }).await
+    task::spawn_blocking(|| fs::write(CONFIG_DIR_FILE_PATH.as_path(), serialized_config).map_err(|e| format!("{e:?}")))
+        .await
         .map_err(|e| format!("{e:?}"))
         .and_then(convert::identity)
 }
@@ -87,7 +95,11 @@ pub async fn load_configuration() -> ConfigurationV3 {
     let configuration: ConfigurationV3 = match loaded_configuration {
         Ok(configuration) => {
             let loaded_configuration: Result<ConfigurationV3, String> = if configuration.version < 3 {
-                fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
+                fs::copy(
+                    CONFIG_DIR_FILE_PATH.as_path(),
+                    get_backup_config_file_path(configuration.version),
+                )
+                .expect("failed to back up config");
                 info!("converting v{} config to v{}", configuration.version, CONFIG_VERSION);
                 fs::read_to_string(CONFIG_DIR_FILE_PATH.as_path())
                     .map_err(|e| format!("{e:?}"))
@@ -103,7 +115,11 @@ pub async fn load_configuration() -> ConfigurationV3 {
                 Ok(configuration) => configuration,
                 Err(e) => {
                     // attempt to backup old config file when read fails
-                    fs::copy(CONFIG_DIR_FILE_PATH.as_path(), get_backup_config_file_path(configuration.version)).expect("failed to back up config");
+                    fs::copy(
+                        CONFIG_DIR_FILE_PATH.as_path(),
+                        get_backup_config_file_path(configuration.version),
+                    )
+                    .expect("failed to back up config");
                     warn!("falling back to default config due to error: {e}");
                     ConfigurationV3::default()
                 }

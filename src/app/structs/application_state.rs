@@ -2,11 +2,11 @@
 // This file is part of buttplug-lite.
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
-use std::sync::Arc;
+use crate::config::v3::ConfigurationV3;
 use buttplug::client::ButtplugClient;
 use buttplug::server::device::ServerDeviceManager;
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::config::v3::ConfigurationV3;
 
 // global state types
 pub type ApplicationStateDb = Arc<RwLock<Option<ApplicationState>>>;

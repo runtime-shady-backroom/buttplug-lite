@@ -16,17 +16,17 @@ use crate::app::buttplug;
 use crate::app::structs::{ApplicationStatus, DeviceStatus};
 use crate::config::v3::{ConfigurationV3, MotorConfigurationV3, MotorTypeV3};
 use crate::gui::constants::*;
+use crate::gui::element_appearance::ElementAppearance;
 use crate::gui::structs::MotorMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
 use crate::gui::tagged_motor::TaggedMotor;
 use crate::gui::theme::dark_theme;
 use crate::gui::util;
+use crate::gui::util::ConstantTitle;
 use crate::gui::TokioExecutor;
 use crate::util::slice as slice_util;
 use crate::util::update_checker;
 use crate::{ApplicationStateDb, ShutdownMessage};
-use crate::gui::element_appearance::ElementAppearance;
-use crate::gui::util::ConstantTitle;
 
 pub fn run(
     application_state_db: ApplicationStateDb,
@@ -34,7 +34,6 @@ pub fn run(
     initial_devices: ApplicationStatus,
     application_status_subscription: SubscriptionProvider<ApplicationStatusEvent>,
 ) {
-
     let settings = Settings {
         id: Some("buttplug-lite".to_string()),
         fonts: vec![],
@@ -51,7 +50,7 @@ pub fn run(
     };
 
     let application_title = ConstantTitle(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")));
-    
+
     iced::application(application_title, Gui::update, Gui::view)
         .settings(settings)
         .theme(|_| dark_theme())
@@ -62,7 +61,7 @@ pub fn run(
 
     match warp_shutdown_tx.send(ShutdownMessage::Shutdown) {
         Ok(()) => info!("shutdown triggered by UI close"),
-        Err(e) => panic!("Error triggering shutdown: {}", e)
+        Err(e) => panic!("Error triggering shutdown: {}", e),
     };
 }
 
@@ -84,7 +83,7 @@ enum Message {
     NativeEventOccurred(Event),
     Tick,
     UpdateButtonPressed,
-    StartupActionCompleted(StartupActionResult)
+    StartupActionCompleted(StartupActionResult),
 }
 
 enum Gui {
@@ -119,7 +118,11 @@ impl Gui {
     fn new(flags: Flags) -> (Self, Task<Message>) {
         let config_version = flags.initial_application_status.configuration.version;
         let port = flags.initial_application_status.configuration.port;
-        let ApplicationStatus { motors, devices, configuration } = flags.initial_application_status;
+        let ApplicationStatus {
+            motors,
+            devices,
+            configuration,
+        } = flags.initial_application_status;
 
         let gui = Gui::Loaded(State {
             devices,
@@ -136,7 +139,10 @@ impl Gui {
             update_check: UpdateCheck::Uninitialized,
         });
 
-        (gui, Task::perform(gui_startup_action(), Message::StartupActionCompleted))
+        (
+            gui,
+            Task::perform(gui_startup_action(), Message::StartupActionCompleted),
+        )
     }
 
     fn on_configuration_changed(&mut self) {
@@ -160,13 +166,15 @@ impl Gui {
                     }
                     Message::RefreshDevices => {
                         info!("device refresh triggered");
-                        Task::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
+                        Task::perform(
+                            get_tagged_devices(state.application_state_db.clone()),
+                            Message::RefreshDevicesComplete,
+                        )
                     }
                     Message::RefreshDevicesComplete(application_status) => {
                         if let Some(application_status) = application_status {
                             // we conduct the ol' switcharoo to move our old state into the new state without having to clone absolutely everything
                             if let Gui::Loaded(old_state) = std::mem::replace(self, Gui::Invalid) {
-
                                 //TODO: something in here nukes the status of motor tags that we're currently editing
                                 if old_state.motors != application_status.motors {
                                     debug!("old motors = {:?}", old_state.motors);
@@ -208,8 +216,16 @@ impl Gui {
 
                             state.port_text = state.port.to_string();
 
-                            let configuration = ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
-                            Task::perform(update_configuration(state.application_state_db.clone(), configuration, state.warp_restart_tx.clone()), Message::SaveConfigurationComplete)
+                            let configuration =
+                                ConfigurationV3::new(state.port, tags_from_application_status(&state.motors));
+                            Task::perform(
+                                update_configuration(
+                                    state.application_state_db.clone(),
+                                    configuration,
+                                    state.warp_restart_tx.clone(),
+                                ),
+                                Message::SaveConfigurationComplete,
+                            )
                         }
                     }
                     Message::SaveConfigurationComplete(result) => {
@@ -241,13 +257,19 @@ impl Gui {
 
                         // motor indices sorted by the tag they reference
                         let mut indices: Vec<usize> = (0..state.motors.len()).collect();
-                        indices.sort_unstable_by_key(|i| override_tag_at_index(&state.motors, *i, motor_index, motor_message.tag()));
+                        indices.sort_unstable_by_key(|i| {
+                            override_tag_at_index(&state.motors, *i, motor_index, motor_message.tag())
+                        });
 
                         // find the duplicate indices
                         // note that this will leave one index from each group in the unique portion: we'll fix this later
                         let split_point = slice_util::partition_dedup_by(&mut indices, |index_a, index_b| {
-                            if let Some(motor_a_tag) = override_tag_at_index(&state.motors, *index_a, motor_index, motor_message.tag()) {
-                                if let Some(motor_b_tag) = override_tag_at_index(&state.motors, *index_b, motor_index, motor_message.tag()) {
+                            if let Some(motor_a_tag) =
+                                override_tag_at_index(&state.motors, *index_a, motor_index, motor_message.tag())
+                            {
+                                if let Some(motor_b_tag) =
+                                    override_tag_at_index(&state.motors, *index_b, motor_index, motor_message.tag())
+                                {
                                     motor_a_tag == motor_b_tag
                                 } else {
                                     // motor_b had no tag, and the absence of a tag cannot be a duplicate
@@ -262,9 +284,15 @@ impl Gui {
                         // do a second pass to pull out the rest of the duplicates
                         let (unique_indices, duplicate_indices) = indices.split_at_mut(split_point);
                         let split_point = itertools::partition(unique_indices, |unique_index| {
-                            let unique_tag = override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag());
+                            let unique_tag =
+                                override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag());
                             !duplicate_indices.iter().any(|duplicate_index| {
-                                let duplicate_tag = override_tag_at_index(&state.motors, *duplicate_index, motor_index, motor_message.tag());
+                                let duplicate_tag = override_tag_at_index(
+                                    &state.motors,
+                                    *duplicate_index,
+                                    motor_index,
+                                    motor_message.tag(),
+                                );
                                 unique_tag == duplicate_tag
                             })
                         });
@@ -273,7 +301,9 @@ impl Gui {
                         // handle each motor with a unique tag
                         let mut tags_valid = true;
                         for unique_index in unique_indices {
-                            let tag = override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag()).map(|t| t.to_string());
+                            let tag =
+                                override_tag_at_index(&state.motors, *unique_index, motor_index, motor_message.tag())
+                                    .map(|t| t.to_string());
                             let motor = &mut state.motors[*unique_index];
                             match tag {
                                 Some(tag) => {
@@ -288,7 +318,14 @@ impl Gui {
                         // handle each motor with a duplicated tag
                         for duplicate_index in duplicate_indices {
                             // safe to unwrap here as duplicate motors cannot have a missing tag
-                            let tag = override_tag_at_index(&state.motors, *duplicate_index, motor_index, motor_message.tag()).unwrap().to_string();
+                            let tag = override_tag_at_index(
+                                &state.motors,
+                                *duplicate_index,
+                                motor_index,
+                                motor_message.tag(),
+                            )
+                            .unwrap()
+                            .to_string();
                             let motor = &mut state.motors[*duplicate_index];
                             motor.update(MotorMessage::TagUpdated { tag, valid: false });
                         }
@@ -308,7 +345,10 @@ impl Gui {
                     }
                     Message::Tick => {
                         // this should keep battery levels reasonably up to date
-                        Task::perform(get_tagged_devices(state.application_state_db.clone()), Message::RefreshDevicesComplete)
+                        Task::perform(
+                            get_tagged_devices(state.application_state_db.clone()),
+                            Message::RefreshDevicesComplete,
+                        )
                     }
                     Message::UpdateButtonPressed => {
                         if let UpdateCheck::UpdateNeeded(update_url) = &state.update_check {
@@ -348,56 +388,46 @@ impl Gui {
                         .padding(TABLE_SPACING)
                         .width(Length::Fill)
                         .push({
-                            let row = Row::new()
-                                .spacing(TABLE_SPACING)
-                                .push(save_button);
+                            let row = Row::new().spacing(TABLE_SPACING).push(save_button);
                             if let UpdateCheck::UpdateNeeded(_) = state.update_check {
                                 row.push(
                                     Button::new(Text::new("Update Available!"))
                                         .on_press(Message::UpdateButtonPressed)
-                                        .style(iced::widget::button::danger) // example: https://github.com/iced-rs/iced/blob/master/examples/pane_grid/src/main.rs
+                                        .style(iced::widget::button::danger), // example: https://github.com/iced-rs/iced/blob/master/examples/pane_grid/src/main.rs
                                 )
                             } else {
                                 row
                             }
                         })
-                        .push(Row::new()
-                            .spacing(EOL_INPUT_SPACING)
-                            .align_y(Alignment::Center)
-                            .push(util::input_label("Server port:"))
-                            .push(
-                                TextInput::new("server port", state.port_text.as_str())
-                                    .on_input(Message::PortUpdated)
-                                    .on_paste(Message::PortUpdated)
-                                    .width(Length::Fixed(PORT_INPUT_WIDTH))
-                                    .padding(TEXT_INPUT_PADDING)
-                                    .style(|theme, status| {
-                                        ElementAppearance::from_port_text(state.port_text.as_str()).text_input_custom_style(theme, status)
-                                    })
-                            )
-                        )
                         .push(
-                            Rule::horizontal(TABLE_SPACING)
+                            Row::new()
+                                .spacing(EOL_INPUT_SPACING)
+                                .align_y(Alignment::Center)
+                                .push(util::input_label("Server port:"))
+                                .push(
+                                    TextInput::new("server port", state.port_text.as_str())
+                                        .on_input(Message::PortUpdated)
+                                        .on_paste(Message::PortUpdated)
+                                        .width(Length::Fixed(PORT_INPUT_WIDTH))
+                                        .padding(TEXT_INPUT_PADDING)
+                                        .style(|theme, status| {
+                                            ElementAppearance::from_port_text(state.port_text.as_str())
+                                                .text_input_custom_style(theme, status)
+                                        }),
+                                ),
                         )
-                        .push(Row::new()
-                            .spacing(TABLE_SPACING)
-                            .push(
-                                render_motor_list(&state.motors)
-                            )
-                            .push(
-                                render_device_list(&state.devices)
-                            )
-                        )
+                        .push(Rule::horizontal(TABLE_SPACING))
                         .push(
-                            Rule::horizontal(TABLE_SPACING)
+                            Row::new()
+                                .spacing(TABLE_SPACING)
+                                .push(render_motor_list(&state.motors))
+                                .push(render_device_list(&state.devices)),
                         )
-                        .push(Text::new(example_message).size(TEXT_SIZE_SMALL))
+                        .push(Rule::horizontal(TABLE_SPACING))
+                        .push(Text::new(example_message).size(TEXT_SIZE_SMALL)),
                 );
 
-                Container::new(content)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into()
+                Container::new(content).width(Length::Fill).height(Length::Fill).into()
             }
         }
     }
@@ -405,16 +435,17 @@ impl Gui {
     // this is called many times in strange and mysterious ways
     fn subscription(&self) -> Subscription<Message> {
         // example: https://github.com/iced-rs/iced/blob/d993b53e095d9cee71c30b315d8fe84d207ddb6d/examples/events/src/main.rs#L57
-        let native_events: Subscription<Message> = iced::event::listen()
-            .map(Message::NativeEventOccurred);
+        let native_events: Subscription<Message> = iced::event::listen().map(Message::NativeEventOccurred);
 
         match self {
             Gui::Loaded(state) => {
-                let application_events = state.application_status_subscription.subscribe()
+                let application_events = state
+                    .application_status_subscription
+                    .subscribe()
                     .map(|event| match event {
                         ApplicationStatusEvent::DeviceAdded => Message::RefreshDevices,
                         ApplicationStatusEvent::DeviceRemoved => Message::RefreshDevices,
-                        ApplicationStatusEvent::Tick => Message::Tick
+                        ApplicationStatusEvent::Tick => Message::Tick,
                     });
                 Subscription::batch(vec![application_events, native_events])
             }
@@ -430,7 +461,13 @@ struct StartupActionResult {
 
 async fn gui_startup_action() -> StartupActionResult {
     // grab our local version
-    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or_else(|e| panic!("Local version \"{}\" didn't follow semver! {}", env!("CARGO_PKG_VERSION"), e));
+    let local_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or_else(|e| {
+        panic!(
+            "Local version \"{}\" didn't follow semver! {}",
+            env!("CARGO_PKG_VERSION"),
+            e
+        )
+    });
     let update_url = update_checker::check_for_update(local_version).await;
     let update_check = match update_url {
         Some(update_url) => UpdateCheck::UpdateNeeded(update_url),
@@ -438,7 +475,6 @@ async fn gui_startup_action() -> StartupActionResult {
     };
     StartupActionResult { update_check }
 }
-
 
 impl Display for TaggedMotor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -453,11 +489,13 @@ fn render_motor_list(motors: &[TaggedMotor]) -> Element<Message> {
     let col = if motors.is_empty() {
         col.push(Text::new("No motors"))
     } else {
-        motors.iter()
-            .enumerate()
-            .fold(col, |column, (i, motor)| {
-                column.push(motor.view().map(move |message| Message::MotorMessageContainer(i, message)))
-            })
+        motors.iter().enumerate().fold(col, |column, (i, motor)| {
+            column.push(
+                motor
+                    .view()
+                    .map(move |message| Message::MotorMessageContainer(i, message)),
+            )
+        })
     };
     col.into()
 }
@@ -469,10 +507,9 @@ fn render_device_list(devices: &[DeviceStatus]) -> Element<Message> {
     let col = if devices.is_empty() {
         col.push(Text::new("No devices"))
     } else {
-        devices.iter()
-            .fold(col, |column, device| {
-                column.push(util::input_label(format!("{device}")))
-            })
+        devices.iter().fold(col, |column, device| {
+            column.push(util::input_label(format!("{device}")))
+        })
     };
     col.into()
 }
@@ -481,19 +518,25 @@ async fn get_tagged_devices(application_state_db: ApplicationStateDb) -> Option<
     buttplug::get_tagged_devices(&application_state_db).await
 }
 
-async fn update_configuration(application_state_db: ApplicationStateDb, configuration: ConfigurationV3, warp_shutdown_tx: UnboundedSender<ShutdownMessage>) -> Result<ConfigurationV3, String> {
+async fn update_configuration(
+    application_state_db: ApplicationStateDb,
+    configuration: ConfigurationV3,
+    warp_shutdown_tx: UnboundedSender<ShutdownMessage>,
+) -> Result<ConfigurationV3, String> {
     crate::config::update_configuration(&application_state_db, configuration, &warp_shutdown_tx).await
 }
 
 fn tags_from_application_status(motors: &[TaggedMotor]) -> HashMap<String, MotorConfigurationV3> {
-    motors.iter()
+    motors
+        .iter()
         .filter(|m| m.tag().is_some())
         .map(|m| (m.tag().unwrap().to_string(), m.motor.clone()))
         .collect()
 }
 
 fn build_example_message(motors: &[TaggedMotor]) -> String {
-    motors.iter()
+    motors
+        .iter()
         .flat_map(|motor| {
             motor.tag().map(|tag| match motor.motor.feature_type {
                 MotorTypeV3::Linear => format!("{tag}:20:0.5"),
@@ -506,7 +549,12 @@ fn build_example_message(motors: &[TaggedMotor]) -> String {
 }
 
 #[inline(always)]
-fn override_tag_at_index<'a>(slice: &'a [TaggedMotor], read_index: usize, override_index: usize, override_value: Option<&'a str>) -> Option<&'a str> {
+fn override_tag_at_index<'a>(
+    slice: &'a [TaggedMotor],
+    read_index: usize,
+    override_index: usize,
+    override_value: Option<&'a str>,
+) -> Option<&'a str> {
     if read_index == override_index {
         override_value
     } else {

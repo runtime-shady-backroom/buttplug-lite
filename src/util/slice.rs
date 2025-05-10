@@ -32,8 +32,8 @@
 /// ```
 #[inline]
 pub fn partition_dedup_by<T, F>(slice: &mut [T], mut same_bucket: F) -> usize
-    where
-        F: FnMut(&mut T, &mut T) -> bool,
+where
+    F: FnMut(&mut T, &mut T) -> bool,
 {
     // Although we have a mutable reference to `self`, we cannot make
     // *arbitrary* changes. The `same_bucket` calls could panic, so we

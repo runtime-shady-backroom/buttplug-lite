@@ -3,8 +3,8 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use buttplug::core::message::ActuatorType as ButtplugActuatorType;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,9 @@ impl Default for ConfigurationV3 {
 impl From<ConfigurationV2> for ConfigurationV3 {
     fn from(configuration_v2: ConfigurationV2) -> Self {
         // find any devices that contain a contraction type, because we can't safely port over ANY of their motors
-        let bad_device_names: HashSet<String> = configuration_v2.tags.values()
+        let bad_device_names: HashSet<String> = configuration_v2
+            .tags
+            .values()
             .filter(|value| value.feature_type == MotorTypeV2::Contraction)
             .map(|value| value.device_name.to_owned())
             .collect();
@@ -79,7 +81,9 @@ impl From<ConfigurationV2> for ConfigurationV3 {
         ConfigurationV3 {
             version: configuration_v2.version,
             port: configuration_v2.port,
-            tags: configuration_v2.tags.into_iter()
+            tags: configuration_v2
+                .tags
+                .into_iter()
                 .filter(|(_key, value)| !bad_device_names.contains(&value.device_name))
                 .filter_map(|(key, value)| value.try_into().ok().map(|value| (key, value)))
                 .collect(),
@@ -100,9 +104,12 @@ impl Display for MotorConfigurationV3 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.device_identifier {
             Some(_identifier) => write!(f, "{} {}#{}", self.device_name, self.feature_type, self.feature_index),
-            None => write!(f, "{} {}#{} [LEGACY]", self.device_name, self.feature_type, self.feature_index),
+            None => write!(
+                f,
+                "{} {}#{} [LEGACY]",
+                self.device_name, self.feature_type, self.feature_index
+            ),
         }
-
     }
 }
 
@@ -134,7 +141,9 @@ impl TryFrom<MotorTypeV2> for MotorTypeV3 {
         match type_v2 {
             MotorTypeV2::Linear => Ok(MotorTypeV3::Linear),
             MotorTypeV2::Rotation => Ok(MotorTypeV3::Rotation),
-            MotorTypeV2::Vibration => Ok(MotorTypeV3::Scalar { actuator_type: ActuatorType::Vibrate }),
+            MotorTypeV2::Vibration => Ok(MotorTypeV3::Scalar {
+                actuator_type: ActuatorType::Vibrate,
+            }),
             MotorTypeV2::Contraction => Err(()),
         }
     }

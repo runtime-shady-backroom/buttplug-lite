@@ -17,10 +17,12 @@ pub struct TokioExecutor {
 
 impl Executor for TokioExecutor {
     fn new() -> Result<Self, futures::io::Error> {
-        Ok(TokioExecutor { rt: GLOBAL_TOKIO_RUNTIME.handle().clone() })
+        Ok(TokioExecutor {
+            rt: GLOBAL_TOKIO_RUNTIME.handle().clone(),
+        })
     }
 
-    fn spawn(&self, future: impl Future<Output=()> + Send + 'static) {
+    fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
         let _join_handle = self.rt.spawn(future);
     }
 

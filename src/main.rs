@@ -6,8 +6,8 @@
 #![windows_subsystem = "windows"]
 
 use std::ops::DerefMut as _;
-use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser as _;
@@ -19,8 +19,8 @@ use crate::app::buttplug;
 use crate::app::structs::{ApplicationState, ApplicationStateDb, CliArgs};
 use crate::app::webserver::ShutdownMessage;
 use crate::gui::subscription::{ApplicationStatusEvent, SubscriptionProvider};
-use crate::util::{logging, watchdog};
 use crate::util::watchdog::WatchdogTimeoutDb;
+use crate::util::{logging, watchdog};
 
 mod app;
 mod config;
@@ -43,7 +43,12 @@ async fn tokio_main() {
         !args.no_panic_handler,
     );
 
-    info!("initializing {} {} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), env!("GIT_COMMIT_HASH"));
+    info!(
+        "initializing {} {} {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("GIT_COMMIT_HASH")
+    );
 
     let watchdog_timeout_db: WatchdogTimeoutDb = Arc::new(AtomicI64::new(i64::MAX));
     let application_state_db: ApplicationStateDb = Arc::new(RwLock::new(None));
@@ -61,12 +66,19 @@ async fn tokio_main() {
             let mut interval = tokio::time::interval(Duration::from_secs(interval));
             loop {
                 interval.tick().await;
-                test_tick_sender.send(ApplicationStatusEvent::next_tick()).expect("WHO DROPPED MY FUCKING RECEIVER? (I wrote this code, so it was me!)");
+                test_tick_sender
+                    .send(ApplicationStatusEvent::next_tick())
+                    .expect("WHO DROPPED MY FUCKING RECEIVER? (I wrote this code, so it was me!)");
             }
         });
     }
 
-    buttplug::start_server(application_state_db.clone(), initial_config_loaded_tx, application_status_sender).await;
+    buttplug::start_server(
+        application_state_db.clone(),
+        initial_config_loaded_tx,
+        application_status_sender,
+    )
+    .await;
 
     // use to shut down or restart the webserver
     let (warp_shutdown_initiate_tx, warp_shutdown_initiate_rx) = mpsc::unbounded_channel::<ShutdownMessage>();
@@ -89,10 +101,17 @@ async fn tokio_main() {
 
     if let Ok(()) = gui_start_rx.await {
         //TODO: wait for buttplug to notice devices
-        let initial_devices = buttplug::get_tagged_devices(&application_state_db).await.expect("Application failed to initialize");
+        let initial_devices = buttplug::get_tagged_devices(&application_state_db)
+            .await
+            .expect("Application failed to initialize");
 
         let subscription = SubscriptionProvider::new(application_status_receiver);
-        gui::run(application_state_db.clone(), warp_shutdown_initiate_tx, initial_devices, subscription); // blocking call
+        gui::run(
+            application_state_db.clone(),
+            warp_shutdown_initiate_tx,
+            initial_devices,
+            subscription,
+        ); // blocking call
 
         // NOTE: iced hard kills the application when the windows is closed!
         // That means this code is unreachable.

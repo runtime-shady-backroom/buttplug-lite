@@ -22,7 +22,6 @@ impl From<&TaggedMotorState> for ElementAppearance {
 }
 
 impl ElementAppearance {
-    
     pub fn from_port_text(port_text: &str) -> Self {
         match port_text.parse::<u16>() {
             Err(_) => ElementAppearance::Invalid,
@@ -33,10 +32,8 @@ impl ElementAppearance {
 
     // example: https://github.com/iced-rs/iced/blob/master/examples/scrollable/src/main.rs
     pub fn text_input_custom_style(&self, theme: &Theme, status: Status) -> text_input::Style {
-
         // see https://github.com/iced-rs/iced/blob/master/widget/src/text_input.rs for defaults
         let palette = theme.extended_palette();
-
 
         let default_background_color = Background::Color(palette.background.base.color);
         let default_value_color = match self {
@@ -44,14 +41,15 @@ impl ElementAppearance {
             _ => palette.background.base.text,
         };
         let (background_color, border_color, value_color) = match status {
-            Status::Active => { // the "base" style
+            Status::Active => {
+                // the "base" style
                 let background_color = default_background_color;
                 let border_color = match self {
                     ElementAppearance::Invalid => palette.danger.strong.color,
                     _ => palette.background.strong.color,
                 };
                 let value_color = default_value_color;
-                
+
                 (background_color, border_color, value_color)
             }
             Status::Hovered => {
@@ -61,7 +59,7 @@ impl ElementAppearance {
                     _ => palette.background.base.text, // different border color from active
                 };
                 let value_color = default_value_color;
-                
+
                 (background_color, border_color, value_color)
             }
             Status::Focused => {
@@ -71,7 +69,7 @@ impl ElementAppearance {
                     _ => palette.primary.strong.color, // different border color from active
                 };
                 let value_color = default_value_color;
-                
+
                 (background_color, border_color, value_color)
             }
             Status::Disabled => {
@@ -81,7 +79,7 @@ impl ElementAppearance {
                     _ => palette.background.strong.color,
                 };
                 let value_color = palette.background.strong.color; // different value color from active
-                
+
                 (background_color, border_color, value_color)
             }
         };

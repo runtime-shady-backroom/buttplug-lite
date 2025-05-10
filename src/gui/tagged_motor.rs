@@ -43,23 +43,17 @@ impl Ord for TaggedMotor {
 impl TaggedMotor {
     pub fn new(motor: MotorConfigurationV3, tag: Option<String>) -> Self {
         let state = match tag {
-            Some(tag) => TaggedMotorState::Tagged {
-                tag,
-                valid: true,
-            },
+            Some(tag) => TaggedMotorState::Tagged { tag, valid: true },
             None => TaggedMotorState::Untagged,
         };
 
-        TaggedMotor {
-            motor,
-            state,
-        }
+        TaggedMotor { motor, state }
     }
 
     pub fn tag(&self) -> Option<&str> {
         match &self.state {
             TaggedMotorState::Tagged { tag, .. } => Some(tag),
-            TaggedMotorState::Untagged => None
+            TaggedMotorState::Untagged => None,
         }
     }
 
@@ -88,29 +82,33 @@ impl TaggedMotor {
             TaggedMotorState::Tagged { tag, valid } => {
                 row.push(
                     TextInput::new("motor tag", tag)
-                        .on_input(|text| MotorMessage::TagUpdated { tag: text, valid: *valid })
-                        .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: *valid })
+                        .on_input(|text| MotorMessage::TagUpdated {
+                            tag: text,
+                            valid: *valid,
+                        })
+                        .on_paste(|text| MotorMessage::TagUpdated {
+                            tag: text,
+                            valid: *valid,
+                        })
                         .width(Length::Fixed(TAG_INPUT_WIDTH))
                         .padding(TEXT_INPUT_PADDING)
                         .style(|theme, status| {
                             // example: https://github.com/iced-rs/iced/blob/master/examples/scrollable/src/main.rs
                             ElementAppearance::from(&self.state).text_input_custom_style(theme, status)
-                        })
+                        }),
                 )
-                    .push(
-                        Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
-                            .on_press(MotorMessage::TagDeleted)
-                    )
-            }
-            TaggedMotorState::Untagged => {
-                row.push(
-                    TextInput::new("motor tag", "")
-                        .on_input(|text| MotorMessage::TagUpdated { tag: text, valid: true })
-                        .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: true })
-                        .width(Length::Fixed(TAG_INPUT_WIDTH))
-                        .padding(TEXT_INPUT_PADDING)
+                .push(
+                    Button::new(Text::new("x")) // font doesn't support funny characters like "✕"
+                        .on_press(MotorMessage::TagDeleted),
                 )
             }
+            TaggedMotorState::Untagged => row.push(
+                TextInput::new("motor tag", "")
+                    .on_input(|text| MotorMessage::TagUpdated { tag: text, valid: true })
+                    .on_paste(|text| MotorMessage::TagUpdated { tag: text, valid: true })
+                    .width(Length::Fixed(TAG_INPUT_WIDTH))
+                    .padding(TEXT_INPUT_PADDING),
+            ),
         };
 
         row.into()
@@ -119,9 +117,6 @@ impl TaggedMotor {
 
 #[derive(Clone, Debug)]
 pub enum TaggedMotorState {
-    Tagged {
-        tag: String,
-        valid: bool,
-    },
+    Tagged { tag: String, valid: bool },
     Untagged,
 }

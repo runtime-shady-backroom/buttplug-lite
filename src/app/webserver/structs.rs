@@ -25,7 +25,7 @@ impl From<&MotorConfigurationV3> for DeviceId {
     fn from(motor_config: &MotorConfigurationV3) -> Self {
         DeviceId {
             name: motor_config.device_name.to_owned(),
-            identifier: motor_config.device_identifier.to_owned()
+            identifier: motor_config.device_identifier.to_owned(),
         }
     }
 }

@@ -4,15 +4,15 @@
 
 //! Logging-related utilities
 
-use std::{fs, io};
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use chrono::Local;
 use directories::ProjectDirs;
 use tracing::{debug, info, warn};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
-use tracing_subscriber::EnvFilter;
 use tracing_subscriber::util::SubscriberInitExt as _;
+use tracing_subscriber::EnvFilter;
 
 use crate::util;
 
@@ -25,8 +25,8 @@ pub fn init(
     verbosity_level: u8,
     log_filter: Option<String>,
     use_stdout: bool,
-    stdout_custom_panic_handler:
-    bool, file_custom_panic_handler: bool
+    stdout_custom_panic_handler: bool,
+    file_custom_panic_handler: bool,
 ) -> Option<WorkerGuard> {
     let log_filter = get_log_filter(verbosity_level, log_filter);
 
@@ -49,7 +49,11 @@ pub fn init_console(custom_panic_handler: bool) {
 
 /// Attempt to log to a file, gracefully falling back to stdout logging on failure
 #[must_use = "this `WorkerGuard` should live until the application shuts down"]
-fn try_init_file_logging(log_filter: EnvFilter, stdout_custom_panic_handler: bool, file_custom_panic_handler: bool) -> Option<WorkerGuard> {
+fn try_init_file_logging(
+    log_filter: EnvFilter,
+    stdout_custom_panic_handler: bool,
+    file_custom_panic_handler: bool,
+) -> Option<WorkerGuard> {
     match create_log_dir_path() {
         Ok(log_dir_path) => {
             let file_appender = tracing_appender::rolling::never(log_dir_path, get_log_file_name());
@@ -69,10 +73,7 @@ fn try_init_file_logging(log_filter: EnvFilter, stdout_custom_panic_handler: boo
 
 /// Start logging framework for stdout
 fn init_console_logging(log_filter: EnvFilter) {
-    tracing_subscriber::fmt()
-        .with_env_filter(log_filter)
-        .finish()
-        .init();
+    tracing_subscriber::fmt().with_env_filter(log_filter).finish().init();
 }
 
 /// Start logging framework for buffered file output

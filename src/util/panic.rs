@@ -3,10 +3,9 @@
 // Copyright 2018 human-panic Individual contributors
 // Copyright 2023 runtime-shady-backroom
 
-/// Handles custom panic hook and logging
-
-use std::{mem, panic, thread};
 use std::fmt::Write as _;
+/// Handles custom panic hook and logging
+use std::{mem, panic, thread};
 
 use backtrace::{Backtrace, BacktraceFrame};
 use tracing::error;
@@ -19,10 +18,7 @@ const NEXT_SYMBOL_PADDING: usize = HEX_WIDTH + 6;
 pub fn set_hook() {
     panic::set_hook(Box::new(|panic_info| {
         let payload = panic_info.payload();
-        let cause = match (
-            payload.downcast_ref::<&str>(),
-            payload.downcast_ref::<String>(),
-        ) {
+        let cause = match (payload.downcast_ref::<&str>(), payload.downcast_ref::<String>()) {
             (_, Some(s)) => Some(s.to_string()),
             (Some(s), _) => Some(s.to_string()),
             (_, _) => None,
@@ -95,12 +91,14 @@ fn should_skip(frame: &&BacktraceFrame) -> bool {
         [first, ..] => {
             if let Some(name) = first.name() {
                 let name = format!("{name}");
-                name != "std::panicking::begin_panic_handler" && name != "core::panicking::panic_fmt" && name != "core::panicking::panic"
+                name != "std::panicking::begin_panic_handler"
+                    && name != "core::panicking::panic_fmt"
+                    && name != "core::panicking::panic"
             } else {
                 false
             }
         }
-        _ => false
+        _ => false,
     }
 }
 
@@ -189,10 +187,7 @@ mod tests {
         assert!(result.is_err());
 
         let cause = result.unwrap_err();
-        let string = match (
-            cause.downcast_ref::<&str>(),
-            cause.downcast_ref::<String>(),
-        ) {
+        let string = match (cause.downcast_ref::<&str>(), cause.downcast_ref::<String>()) {
             (_, Some(s)) => Some(s.to_string()),
             (Some(s), _) => Some(s.to_string()),
             (_, _) => None,
@@ -211,10 +206,7 @@ mod tests {
         assert!(result.is_err());
 
         let cause = result.unwrap_err();
-        let string = match (
-            cause.downcast_ref::<&str>(),
-            cause.downcast_ref::<String>(),
-        ) {
+        let string = match (cause.downcast_ref::<&str>(), cause.downcast_ref::<String>()) {
             (_, Some(s)) => Some(s.to_string()),
             (Some(s), _) => Some(s.to_string()),
             (_, _) => None,

@@ -3,8 +3,8 @@
 // buttplug-lite is licensed under the AGPL-3.0 license (see LICENSE file for details).
 
 use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 /// status of a single device
 #[derive(Clone, Debug)]

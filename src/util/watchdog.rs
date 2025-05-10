@@ -4,8 +4,8 @@
 
 use std::convert::TryFrom as _;
 use std::ops::Add as _;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::task;
@@ -30,13 +30,16 @@ pub fn start(watchdog_timeout_db: WatchdogTimeoutDb, buttplug_connector_db: Appl
             interval.tick().await;
             let watchdog_violation = unix_time() > watchdog_timeout_db.load(Ordering::Relaxed);
             if watchdog_violation {
-                warn!("Watchdog violation! Halting all devices. To avoid this send an update at least every {}ms.", WATCHDOG_TIMEOUT.as_millis());
+                warn!(
+                    "Watchdog violation! Halting all devices. To avoid this send an update at least every {}ms.",
+                    WATCHDOG_TIMEOUT.as_millis()
+                );
                 watchdog_timeout_db.store(i64::MAX, Ordering::Relaxed); // this prevents the message from spamming
                 let buttplug_connector_mutex = buttplug_connector_db.read().await;
                 if let Some(buttplug_connector) = buttplug_connector_mutex.as_ref() {
                     match buttplug_connector.client.stop_all_devices().await {
                         Ok(()) => (),
-                        Err(e) => warn!("watchdog: error halting devices: {e:?}")
+                        Err(e) => warn!("watchdog: error halting devices: {e:?}"),
                     }
                 } // else, do nothing because there is no server connected
             }
@@ -50,7 +53,8 @@ pub async fn feed(watchdog_timeout_db: &WatchdogTimeoutDb) {
 }
 
 fn unix_time_plus(plus: Duration) -> i64 {
-    let unix_time = UNIX_EPOCH.elapsed()
+    let unix_time = UNIX_EPOCH
+        .elapsed()
         .expect("Your system clock is wrong")
         .add(plus)
         .as_millis();

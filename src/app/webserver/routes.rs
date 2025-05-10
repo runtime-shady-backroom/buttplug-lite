@@ -32,7 +32,6 @@ pub fn start_webserver(
     gui_start_tx: oneshot::Sender<()>,
     mut warp_shutdown_initiate_rx: mpsc::UnboundedReceiver<ShutdownMessage>,
     warp_shutdown_complete_tx: oneshot::Sender<()>,
-
 ) {
     // GET / => 200 OK with body application name and version
     let info = warp::path::end()
@@ -62,20 +61,20 @@ pub fn start_webserver(
         .and(warp::ws())
         .and(with_db(application_state_db.clone()))
         .and(with_db(watchdog_timeout_db.clone()))
-        .map(|ws: warp::ws::Ws, application_state_db: ApplicationStateDb, haptic_watchdog_db: WatchdogTimeoutDb| {
-            ws.on_upgrade(|ws| haptic_handler(ws, application_state_db, haptic_watchdog_db))
-        });
+        .map(
+            |ws: warp::ws::Ws, application_state_db: ApplicationStateDb, haptic_watchdog_db: WatchdogTimeoutDb| {
+                ws.on_upgrade(|ws| haptic_handler(ws, application_state_db, haptic_watchdog_db))
+            },
+        );
 
-    let routes = info
-        .or(hapticstatus)
-        .or(batterystatus)
-        .or(deviceconfig)
-        .or(haptic);
+    let routes = info.or(hapticstatus).or(batterystatus).or(deviceconfig).or(haptic);
 
     // moved into the following task
     let reconnect_task_application_state_db_clone = application_state_db.clone();
     task::spawn(async move {
-        initial_config_loaded_rx.await.expect("failed to load initial configuration");
+        initial_config_loaded_rx
+            .await
+            .expect("failed to load initial configuration");
 
         let mut gui_start_oneshot_tx = Some(gui_start_tx); // will get None'd after the first loop
 
@@ -85,12 +84,20 @@ pub fn start_webserver(
             // this is needed because we cannot move the mpsc consumer
             let (warp_shutdown_oneshot_tx, warp_shutdown_oneshot_rx) = oneshot::channel::<()>();
 
-            let port = reconnect_task_application_state_db_clone.read().await.as_ref().expect("failed to read initial configuration").configuration.port;
+            let port = reconnect_task_application_state_db_clone
+                .read()
+                .await
+                .as_ref()
+                .expect("failed to read initial configuration")
+                .configuration
+                .port;
             let proxy_server_address: SocketAddr = ([127, 0, 0, 1], port).into();
 
-            let server = warp::serve(routes.clone())
-                .try_bind_with_graceful_shutdown(proxy_server_address, async move {
-                    warp_shutdown_oneshot_rx.await.expect("error receiving warp shutdown signal");
+            let server =
+                warp::serve(routes.clone()).try_bind_with_graceful_shutdown(proxy_server_address, async move {
+                    warp_shutdown_oneshot_rx
+                        .await
+                        .expect("error receiving warp shutdown signal");
                     info!("shutting down web server")
                 });
 
@@ -110,8 +117,13 @@ pub fn start_webserver(
                     });
 
                     // sacrifice this thread to shutdown trigger bullshit
-                    let signal = warp_shutdown_initiate_rx.recv().await.unwrap_or(ShutdownMessage::Shutdown);
-                    warp_shutdown_oneshot_tx.send(()).expect("error transmitting warp shutdown signal");
+                    let signal = warp_shutdown_initiate_rx
+                        .recv()
+                        .await
+                        .unwrap_or(ShutdownMessage::Shutdown);
+                    warp_shutdown_oneshot_tx
+                        .send(())
+                        .expect("error transmitting warp shutdown signal");
                     signal
                 }
                 Err(e) => {
@@ -126,11 +138,13 @@ pub fn start_webserver(
             }
             // otherwise we go again
         }
-        warp_shutdown_complete_tx.send(()).expect("warp shut down started, but could not transmit callback signal");
+        warp_shutdown_complete_tx
+            .send(())
+            .expect("warp shut down started, but could not transmit callback signal");
     });
 }
 
-fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract=(T, ), Error=convert::Infallible> + Clone {
+fn with_db<T: Clone + Send>(db: T) -> impl Filter<Extract = (T,), Error = convert::Infallible> + Clone {
     warp::any().map(move || db.clone())
 }
 
@@ -147,15 +161,24 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
                     string.push_str(format!(" [{display_name}]").as_str());
                 }
 
-                let scalar_cmds = device.message_attributes().scalar_cmd().iter()
+                let scalar_cmds = device
+                    .message_attributes()
+                    .scalar_cmd()
+                    .iter()
                     .flat_map(|inner| inner.iter())
                     .map(|value| (ButtplugDeviceMessageType::ScalarCmd, value));
 
-                let rotate_cmds = device.message_attributes().rotate_cmd().iter()
+                let rotate_cmds = device
+                    .message_attributes()
+                    .rotate_cmd()
+                    .iter()
                     .flat_map(|inner| inner.iter())
                     .map(|value| (ButtplugDeviceMessageType::RotateCmd, value));
 
-                let linear_cmds = device.message_attributes().linear_cmd().iter()
+                let linear_cmds = device
+                    .message_attributes()
+                    .linear_cmd()
+                    .iter()
                     .flat_map(|inner| inner.iter())
                     .map(|value| (ButtplugDeviceMessageType::LinearCmd, value));
 
@@ -167,7 +190,7 @@ async fn haptic_status_handler(application_state_db: ApplicationStateDb) -> Resu
             }
             Ok(string)
         }
-        None => Ok(String::from("device server running=None"))
+        None => Ok(String::from("device server running=None")),
     }
 }
 
@@ -178,7 +201,10 @@ async fn battery_status_handler(application_state_db: ApplicationStateDb) -> Res
         Some(application_state) => {
             let mut string = String::new();
             for device in application_state.client.devices() {
-                let battery_level = if device.message_attributes().message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd) {
+                let battery_level = if device
+                    .message_attributes()
+                    .message_allowed(&ButtplugDeviceMessageType::BatteryLevelCmd)
+                {
                     device.battery_level().await.ok()
                 } else {
                     None
@@ -187,7 +213,7 @@ async fn battery_status_handler(application_state_db: ApplicationStateDb) -> Res
             }
             Ok(string)
         }
-        None => Ok(String::new())
+        None => Ok(String::new()),
     }
 }
 
@@ -202,7 +228,7 @@ async fn device_config_handler(application_state_db: ApplicationStateDb) -> Resu
             }
             Ok(string)
         }
-        None => Ok(String::new())
+        None => Ok(String::new()),
     }
 }
 
@@ -264,7 +290,8 @@ async fn haptic_handler(
                     identifier: device_identifier,
                 };
 
-                let motor_settings = device_map.remove(&key)
+                let motor_settings = device_map
+                    .remove(&key)
                     .or_else(|| device_map.remove(&key.without_identifier())); // fall back to no-id check in case of old configs
 
                 if let Some(motor_settings) = motor_settings {
@@ -277,19 +304,19 @@ async fn haptic_handler(
                     if !scalar_map.is_empty() {
                         match device.scalar(&ScalarCommand::ScalarMap(scalar_map)).await {
                             Ok(()) => (),
-                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}",)
+                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}",),
                         }
                     }
                     if !rotate_map.is_empty() {
                         match device.rotate(&RotateCommand::RotateMap(rotate_map)).await {
                             Ok(()) => (),
-                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}")
+                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}"),
                         }
                     }
                     if !linear_map.is_empty() {
                         match device.linear(&LinearCommand::LinearMap(linear_map)).await {
                             Ok(()) => (),
-                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}")
+                            Err(e) => warn!("{LOG_PREFIX_HAPTIC_ENDPOINT}: error sending command {e:?}"),
                         }
                     }
                 }; // else, ignore this device
@@ -315,82 +342,86 @@ async fn haptic_handler(
  *    Motor1Index: Motor1Strength
  *    Motor2Index: Motor2Strength
  */
-fn build_vibration_map(configuration: &ConfigurationV3, command: &str) -> Result<HashMap<DeviceId, MotorSettings>, String> {
+fn build_vibration_map(
+    configuration: &ConfigurationV3,
+    command: &str,
+) -> Result<HashMap<DeviceId, MotorSettings>, String> {
     let mut devices: HashMap<DeviceId, MotorSettings> = HashMap::new();
 
     for line in command.split_terminator(';') {
         let mut split_line = line.split(':');
         let tag = match split_line.next() {
             Some(tag) => tag,
-            None => return Err(format!("could not extract motor tag from {line}"))
+            None => return Err(format!("could not extract motor tag from {line}")),
         };
         match configuration.motor_from_tag(tag) {
-            Some(motor) => {
-                match &motor.feature_type {
-                    MotorTypeV3::Scalar { actuator_type } => {
-                        let intensity = match split_line.next() {
-                            Some(tag) => tag,
-                            None => return Err(format!("could not extract motor intensity from {line}"))
-                        };
-                        let intensity = match intensity.parse::<f64>() {
-                            Ok(f) => f.filter_nan().clamp(0.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor intensity from {intensity}: {e:?}"))
-                        };
+            Some(motor) => match &motor.feature_type {
+                MotorTypeV3::Scalar { actuator_type } => {
+                    let intensity = match split_line.next() {
+                        Some(tag) => tag,
+                        None => return Err(format!("could not extract motor intensity from {line}")),
+                    };
+                    let intensity = match intensity.parse::<f64>() {
+                        Ok(f) => f.filter_nan().clamp(0.0, 1.0),
+                        Err(e) => return Err(format!("could not parse motor intensity from {intensity}: {e:?}")),
+                    };
 
-                        devices.entry(motor.into())
-                            .or_default()
-                            .scalar_map
-                            .insert(motor.feature_index, (intensity, actuator_type.to_buttplug()));
-                    }
-                    MotorTypeV3::Linear => {
-                        let duration = match split_line.next() {
-                            Some(tag) => tag,
-                            None => return Err(format!("could not extract motor duration from {line}"))
-                        };
-                        let duration = match duration.parse::<u32>() {
-                            Ok(u) => u,
-                            Err(e) => return Err(format!("could not parse motor duration from {duration}: {e:?}"))
-                        };
-
-                        let position = match split_line.next() {
-                            Some(tag) => tag,
-                            None => return Err(format!("could not extract motor position from {line}"))
-                        };
-                        let position = match position.parse::<f64>() {
-                            Ok(f) => f.filter_nan().clamp(0.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor position from {position}: {e:?}"))
-                        };
-
-                        devices.entry(motor.into())
-                            .or_default()
-                            .linear_map
-                            .insert(motor.feature_index, (duration, position));
-                    }
-                    MotorTypeV3::Rotation => {
-                        let speed = match split_line.next() {
-                            Some(tag) => tag,
-                            None => return Err(format!("could not extract motor speed from {line}"))
-                        };
-                        let mut speed = match speed.parse::<f64>() {
-                            Ok(f) => f.filter_nan().clamp(-1.0, 1.0),
-                            Err(e) => return Err(format!("could not parse motor speed from {speed}: {e:?}"))
-                        };
-
-                        let direction = speed >= 0.0;
-                        if !direction {
-                            speed = -speed;
-                        }
-
-                        devices.entry(motor.into())
-                            .or_default()
-                            .rotate_map
-                            .insert(motor.feature_index, (speed, direction));
-                    }
+                    devices
+                        .entry(motor.into())
+                        .or_default()
+                        .scalar_map
+                        .insert(motor.feature_index, (intensity, actuator_type.to_buttplug()));
                 }
-            }
-            None => debug!("{LOG_PREFIX_HAPTIC_ENDPOINT}: ignoring unknown motor tag {tag}")
+                MotorTypeV3::Linear => {
+                    let duration = match split_line.next() {
+                        Some(tag) => tag,
+                        None => return Err(format!("could not extract motor duration from {line}")),
+                    };
+                    let duration = match duration.parse::<u32>() {
+                        Ok(u) => u,
+                        Err(e) => return Err(format!("could not parse motor duration from {duration}: {e:?}")),
+                    };
+
+                    let position = match split_line.next() {
+                        Some(tag) => tag,
+                        None => return Err(format!("could not extract motor position from {line}")),
+                    };
+                    let position = match position.parse::<f64>() {
+                        Ok(f) => f.filter_nan().clamp(0.0, 1.0),
+                        Err(e) => return Err(format!("could not parse motor position from {position}: {e:?}")),
+                    };
+
+                    devices
+                        .entry(motor.into())
+                        .or_default()
+                        .linear_map
+                        .insert(motor.feature_index, (duration, position));
+                }
+                MotorTypeV3::Rotation => {
+                    let speed = match split_line.next() {
+                        Some(tag) => tag,
+                        None => return Err(format!("could not extract motor speed from {line}")),
+                    };
+                    let mut speed = match speed.parse::<f64>() {
+                        Ok(f) => f.filter_nan().clamp(-1.0, 1.0),
+                        Err(e) => return Err(format!("could not parse motor speed from {speed}: {e:?}")),
+                    };
+
+                    let direction = speed >= 0.0;
+                    if !direction {
+                        speed = -speed;
+                    }
+
+                    devices
+                        .entry(motor.into())
+                        .or_default()
+                        .rotate_map
+                        .insert(motor.feature_index, (speed, direction));
+                }
+            },
+            None => debug!("{LOG_PREFIX_HAPTIC_ENDPOINT}: ignoring unknown motor tag {tag}"),
         };
-    };
+    }
 
     // Ok(&mut devices)
     Ok(devices)

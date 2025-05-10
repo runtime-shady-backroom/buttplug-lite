@@ -4,9 +4,9 @@
 
 //! GitHub Releases-based update checking
 
+use reqwest::header;
 use std::cmp::Ordering;
 use std::time::Duration;
-use reqwest::header;
 
 use semver::Version;
 use serde::Deserialize;
@@ -17,7 +17,6 @@ const UPDATE_CHECK_URI: &str = "https://api.github.com/repos/runtime-shady-backr
 
 /// Compare the local version to the latest GitHub release. If there's a newer version available, return its URL.
 pub async fn check_for_update(local_version: Version) -> Option<String> {
-
     match get_latest_release().await {
         Ok(response) => {
             info!("Update Url: {:?}", response.html_url);
@@ -68,12 +67,15 @@ async fn get_latest_release() -> Result<GithubRelease, String> {
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
-    let request = client.get(UPDATE_CHECK_URI)
+    let request = client
+        .get(UPDATE_CHECK_URI)
         .header(header::ACCEPT, "application/json")
         .build()
         .map_err(|e| format!("Failed to build update check HTTP request: {e}"))?;
 
-    let response = client.execute(request).await
+    let response = client
+        .execute(request)
+        .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
     // Note that this buffers the entire JSON response before it begins parsing.
@@ -86,7 +88,9 @@ async fn get_latest_release() -> Result<GithubRelease, String> {
     //
     // If I really care about optimizing this, the _real_ target would be to implement etag-based caching.
     let status = response.status();
-    response.json::<GithubRelease>().await
+    response
+        .json::<GithubRelease>()
+        .await
         .map_err(|e| format!("error parsing github release {} response: {}", status.as_str(), e))
 }
 
