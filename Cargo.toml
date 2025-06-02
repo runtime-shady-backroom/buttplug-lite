@@ -28,7 +28,6 @@ open = "5" # Used to open application update pages in your browser
 reqwest = { version = "0.12", default-features = false, features = ["gzip", "json", "rustls-tls", "http2"] } # HTTP client used by the update checker
 semver = "1" # Used for application update checking
 serde = "1" # The (de)serialization library
-serde_json = "1" # Used to deserialize GitHub API responses (used by application update checker)
 tokio = { version = "1", features = ["full"] } # Async runtime
 tokio-stream = "0.1" # Used in my iced subscription implementation
 toml = "0.8" # Used for configuration file (de)serialization
