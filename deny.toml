@@ -239,13 +239,10 @@ skip = [
     { crate = "bit-set@0.5.3", reason = "used by iced/.../wgpu" },
     { crate = "bit-vec@0.6.3", reason = "used by iced/.../wgpu" },
     { crate = "redox_users@0.4.6", reason = "used by iced/.../dirs" },
-    { crate = "windows-strings@0.3.1", reason = "used by buttplug/reqwest/windows-registry... and the new version is used by buttplug as well" },
-    { crate = "webpki-roots@0.26.11", reason = "webpki-roots@0.26.11 fucking depends on webpki-roots@1.0.0 what the fuck" },
     { crate = "linux-raw-sys@0.4.15", reason = "old version is still used by a bunch of stuff" },
 
     # Allow a bunch of wrapper libs (native bindings, etc.)
     "core-graphics",
-    "hermit-abi",
     "jni", # Rust bindings to the JNI
     "libloading",
     "ndk-sys", # bindings to android NDK
