@@ -17,7 +17,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') || (startsWith(github.ref, 'refs/heads/') && !startsWith(github.ref, 'refs/heads/dependabot/'))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: EmbarkStudios/cargo-deny-action@v2
   build:
     # only run for pushes to tags or non-dependabot branches
@@ -58,7 +58,7 @@ jobs:
     runs-on: ${{ matrix.target.runs-on }}
     steps:
       - name: git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup workflow cache
         uses: actions/cache@v4
         with:
