@@ -50,7 +50,7 @@
         };
 
         default =
-          (pkgs.runCommandNoCC "buttplug-lite" {
+          (pkgs.runCommand "buttplug-lite" {
             pname = "buttplug-lite";
             inherit (unwrapped) version;
             inherit (unwrapped) meta;
