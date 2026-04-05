@@ -6,29 +6,26 @@
   };
 
   outputs =
-    { self, nixpkgs }:
+    { nixpkgs, ... }:
     let
       pkgs = import nixpkgs { system = "x86_64-linux"; };
-      libs =
-        with pkgs;
-        with pkgs.xorg;
-        [
-          libX11
-          libGL
-          libxcb
-          libxkbcommon
-          dbus.dev
-          udev.dev
-          openssl.dev
-          wayland
-        ];
+      libs = with pkgs; [
+        libX11
+        libGL
+        libxcb
+        libxkbcommon
+        dbus.dev
+        udev.dev
+        openssl.dev
+        wayland
+      ];
       libraryPath = "${pkgs.lib.makeLibraryPath libs}";
     in
     {
       packages.x86_64-linux = rec {
         unwrapped = pkgs.rustPlatform.buildRustPackage {
           pname = "buttplug-lite-unwrapped";
-          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+          version = (fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 
           nativeBuildInputs = with pkgs; [
             pkg-config
