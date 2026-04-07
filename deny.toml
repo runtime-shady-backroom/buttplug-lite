@@ -93,7 +93,7 @@ ignore = [
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     # Bog standard stuff
-    "AGPL-3.0",
+    "AGPL-3.0-only",
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
@@ -222,10 +222,9 @@ skip = [
     { crate = "hashbrown@0.12.3", reason = "used by iced/dark-light/rust-ini/ordered-multimap" },
     { crate = "base64@0.21.7", reason = "used by warp/headers" },
     { crate = "core-foundation@0.9.4", reason = "used by iced/iced_winit/winit... and the new version is ALSO used by iced" },
-    { crate = "core-graphics-types@0.1.3", reason = "used by iced/iced_winit/winit... and the new version is ALSO used by iced" },
     { crate = "dashmap@5.5.3", reason = "used by buttplug/btleplug/jni-utils" },
     { crate = "dirs-sys@0.3.7", reason = "used by iced/dark-light" },
-    { crate = "h2@0.3.26", reason = "used by warp/hyper" },
+    { crate = "h2@0.3.27", reason = "used by warp/hyper" },
     { crate = "http@0.2.12", reason = "used by warp" },
     { crate = "http-body@0.4.6", reason = "used by warp" },
     { crate = "hyper@0.14.32", reason = "used by warp" },
@@ -242,7 +241,6 @@ skip = [
     { crate = "linux-raw-sys@0.4.15", reason = "old version is still used by a bunch of stuff" },
 
     # Allow a bunch of wrapper libs (native bindings, etc.)
-    "core-graphics",
     "jni", # Rust bindings to the JNI
     "libloading",
     "ndk-sys", # bindings to android NDK
@@ -251,14 +249,6 @@ skip = [
     "windows", # Safer bindings including C-style APIs as well as COM and WinRT APIs.
     "windows-core", # Type support for the windows crate
     "windows-sys", # Raw bindings for C-style Windows APIs.
-    "windows-targets", # Import libs for Windows.
-    "windows_aarch64_gnullvm",
-    "windows_aarch64_msvc",
-    "windows_i686_gnu",
-    "windows_i686_msvc",
-    "windows_x86_64_gnu",
-    "windows_x86_64_gnullvm",
-    "windows_x86_64_msvc",
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
