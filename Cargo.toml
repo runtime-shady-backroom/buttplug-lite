@@ -34,4 +34,4 @@ toml = "0.8" # Used for configuration file (de)serialization
 tracing = "0.1" # Used for logging
 tracing-appender = "0.2" # Used for logging
 tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Used for logging
-warp = "0.3" # Provides the web server
+warp = "0.4" # Provides the web server
