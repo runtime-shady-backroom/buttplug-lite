@@ -83,7 +83,7 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target.triple }}
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: buttplug-lite-${{ matrix.target.triple }}
           path: ./target/${{ matrix.target.triple }}/release/buttplug-lite${{ matrix.target.suffix }}
