@@ -30,7 +30,7 @@ semver = "1" # Used for application update checking
 serde = "1" # The (de)serialization library
 tokio = { version = "1", features = ["full"] } # Async runtime
 tokio-stream = "0.1" # Used in my iced subscription implementation
-toml = "0.8" # Used for configuration file (de)serialization
+toml = "1.1" # Used for configuration file (de)serialization
 tracing = "0.1" # Used for logging
 tracing-appender = "0.2" # Used for logging
 tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Used for logging
